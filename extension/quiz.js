@@ -6,6 +6,7 @@ let questionDeque = [];
 let quizContainer;
 let selectedWords = new Set();
 let highlightEnabled = false;
+let currentMaliciousState = null;
 
 // Fetch questions from API
 async function fetchQuestions() {
@@ -34,9 +35,14 @@ async function renderNextQuestion() {
     }
 
     highlightEnabled = false; // Reset highlighting for new question
+    currentMaliciousState = questionData.malicious;
     selectedWords.clear(); // Clear previous selections
     clearQuizContainer();
     renderQuiz(questionData);
+}
+
+function validateAnswer(isMalicious) {
+    return isMalicious === currentMaliciousState;
 }
 
 // Clear quiz container
@@ -83,7 +89,15 @@ function renderQuiz(data) {
         fontSize: "16px",
         transition: "background-color 0.3s",
     });
-    maliciousButton.onclick = () => enableHighlighting(reportButtonsContainer);
+    maliciousButton.onclick = async () => {
+        const message = validateAnswer(true) ? "Correct! This message is malicious." : "Incorrect! This message is not malicious.";
+        alert(message);
+
+        if (validateAnswer(true))
+            enableHighlighting(reportButtonsContainer);
+        else
+            await renderNextQuestion();
+    };
 
     const notMaliciousButton = createElement("button", "Report as Not Malicious", {
         backgroundColor: greenButton,
@@ -96,7 +110,10 @@ function renderQuiz(data) {
         fontSize: "16px",
         transition: "background-color 0.3s",
     });
+
     notMaliciousButton.onclick = async () => {
+        const message = validateAnswer(false) ? "Correct! This message is not malicious." : "Incorrect! This message is malicious.";
+        alert(message);
         await renderNextQuestion();
     };
 
