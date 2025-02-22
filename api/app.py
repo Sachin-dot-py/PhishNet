@@ -91,5 +91,37 @@ def post_feedback():
     }
     return jsonify(response)
 
+@app.route('/api/blocker/predictMalicious', methods=['POST'])
+def predict_malicious():
+    """
+    Takes in a JSON payload with the following format:
+    {
+        "type": str,         # One of "message", "tweet", or "email"
+        "content": str,      # Provided if type is "message" or "tweet" 
+        "subject": str,      # Provided if type is "email"
+        "body": str          # Provided if type is "email"
+    }
+
+    Returns a JSON response in the following format:
+    {
+        "score": int,         # A value of 0 or 1 representing the probability of the content being malicious
+        "explanation": str    # Explanation of why we think it's malicious or not, for display to the user
+    }
+
+    """
+    data = request.get_json()
+
+    # Generate a random score (0 or 1) and a dummy explanation
+    score = random.randint(0, 1)
+    explanation = (
+        "The analysis indicates that the content is likely "
+        "malicious." if score == 1 else "The content appears to be safe."
+    )
+
+    return jsonify({
+        "score": score,
+        "explanation": explanation
+    })
+
 if __name__ == '__main__':
     app.run(debug=True)
