@@ -78,9 +78,9 @@ function renderQuiz(data) {
     maliciousButton.style.cssText += 'box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);';
     maliciousButton.onclick = async () => {
         if (malicious) {
-            alert('Correct! It is malicious.');
+            console.log('Correct! It is malicious.');
         } else {
-            alert('Wrong! It is not malicious.');
+            console.log('Wrong! It is not malicious.');
         }
         await renderNextQuestion(); // Render the next question after reporting
     };
@@ -98,9 +98,9 @@ function renderQuiz(data) {
     });
     notMaliciousButton.onclick = async () => {
         if (!malicious) {
-            alert('Correct! It is not malicious.');
+            console.log('Correct! It is not malicious.');
         } else {
-            alert('Wrong! It is malicious.');
+            console.log('Wrong! It is malicious.');
         }
         await renderNextQuestion(); // Render the next question after reporting
     };

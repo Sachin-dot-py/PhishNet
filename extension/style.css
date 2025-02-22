@@ -57,6 +57,11 @@ p#num-info {
     padding-left: 10px;
 }
 
+p#num-info span {
+    color: rgb(181, 181, 181);
+    display: inline !important;
+}
+
 div#phish-net span {
     display: block;
     text-align: center;
