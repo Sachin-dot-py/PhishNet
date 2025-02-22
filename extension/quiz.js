@@ -1,4 +1,5 @@
 const buttonThemeColor = "#e30000";
+const greenButton = "#09b852"
 
 
 /**
@@ -32,15 +33,15 @@ function renderQuiz(data) {
     maliciousButton.onclick = () => alert('Reported as malicious!');
 
     const notMaliciousButton = createElement('button', 'Report as Not Malicious', {
-        backgroundColor: 'transparent',
-        color: buttonThemeColor,
-        border: `2px solid ${buttonThemeColor}`,
+        backgroundColor: greenButton,
+        color: 'white',
+        border: 'none',
         borderRadius: '980px',
         padding: '10px 20px',
         margin: '0 5px',
         cursor: 'pointer',
         fontSize: '16px',
-        transition: 'background-color 0.3s, color 0.3s',
+        transition: 'background-color 0.3s',
     });
 
     notMaliciousButton.onclick = () => alert('Reported as not malicious!');
