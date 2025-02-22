@@ -27,19 +27,24 @@ async function renderNextQuestion() {
     if (questionDeque.length === 0) {
         await loadMoreQuestions();
     }
-    const questionData = questionDeque.shift();
+    
+    const currentQuestion = questionDeque.shift(); // Store current question
 
-    if (!questionData) {
+    if (!currentQuestion) {
         console.error("No question data available to render");
         return;
     }
 
-    highlightEnabled = false; // Reset highlighting for new question
-    currentMaliciousState = questionData.malicious;
+    highlightEnabled = false; // Reset highlighting
+    currentMaliciousState = currentQuestion.malicious;
     selectedWords.clear(); // Clear previous selections
     clearQuizContainer();
-    renderQuiz(questionData);
+    renderQuiz(currentQuestion);
+    
+    // Attach currentQuestion to the window for reference in submitButton.onclick
+    window.currentQuestion = currentQuestion;
 }
+
 
 function validateAnswer(isMalicious) {
     return isMalicious === currentMaliciousState;
@@ -97,7 +102,7 @@ function renderQuiz(data) {
             enableHighlighting(reportButtonsContainer);
             return;
         }
-        
+
         await renderNextQuestion();
     };
 
@@ -142,15 +147,48 @@ function enableHighlighting(reportButtonsContainer) {
         display: "block",
     });
 
-    submitButton.onclick = () => {
+    submitButton.onclick = async () => {
         if (selectedWords.size === 0) {
             alert("Selecting suspicious text is necessary.");
             return;
         }
-        alert(getOrderedSelectedWords().join(" ")); // Alert selected words in order
+    
+        // Use the stored current question instead of questionDeque[0]
+        const selectedWordsArray = getOrderedSelectedWords();
+        const requestBody = {
+            id: window.currentQuestion?.id, // Use stored question reference
+            userMalicious: currentMaliciousState, // User's determination
+        };
+    
+        console.log(window.currentQuestion); // Now logs the correct question
+    
+        if (window.currentQuestion?.type === "email") {
+            requestBody.wordsListSubject = selectedWordsArray;
+            requestBody.wordsListBody = [];
+        } else {
+            requestBody.wordsList = selectedWordsArray;
+        }
+    
+    
+        try {
+            const response = await fetch(`${AWS_LINK}/api/game/getFeedback`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody),
+            });
+    
+            const responseData = await response.json();
+            alert(responseData.feedback);
+        } catch (error) {
+            console.error("Error submitting feedback:", error);
+            alert("An error occurred while submitting your response.");
+        }
+    
         clearQuizContainer();
         renderNextQuestion();
     };
+    
+
 
     quizContainer.appendChild(submitButton);
 }
