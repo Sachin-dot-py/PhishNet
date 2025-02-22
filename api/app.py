@@ -40,9 +40,9 @@ def get_single_question():
     {
         "id": int,  # Unique identifier for the question
         "type": str,  # One of "message", "tweet", or "email"
-        "content": str (if type is "message" or "tweet"),
-        "subject": str (if type is "email"),
-        "body": str (if type is "email")
+        "content": str (if type is "message" or "tweet"), # Max 100 words
+        "subject": str (if type is "email"), # Max 15 words
+        "body": str (if type is "email") # Max 100 words
     }
     """
     question = random.choice(QUESTIONS)
