@@ -12,10 +12,6 @@ from sklearn.metrics import roc_auc_score, accuracy_score
 def clean_text(text):
     if pd.isnull(text):
         return ""
-    text = text.lower()  # convert to lowercase
-    text = re.sub(r'http\S+|www\S+|@\S+', '', text)  # remove URLs and email addresses
-    text = re.sub(r'[^a-z\s]', '', text)  # remove special characters and numbers
-    text = re.sub(r'\s+', ' ', text).strip()  # remove extra spaces
     return text
 
 # Function to load and clean a dataset given a file path and its expected columns
