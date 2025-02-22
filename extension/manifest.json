@@ -4,7 +4,8 @@
     "version": "1.0",
     "description": "A chrome extension that flags fake news on almost every social media website and comes with a practice game.",
     "action": {
-        "default_popup": "index.html"
+        "default_popup": "index.html",
+        "default_icon": "icons/logo_black.png"
     },
     "background": {
         "service_worker": "scripts/background.js"
