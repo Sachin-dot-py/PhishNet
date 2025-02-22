@@ -1,15 +1,12 @@
 import re
 import pickle
 import pandas as pd
+from url_malicious import predict_malicious_url
 
 # Define the same text cleaning function
 def clean_text(text):
     if pd.isnull(text):
         return ""
-    text = text.lower()
-    text = re.sub(r'http\S+|www\S+|@\S+', '', text)
-    text = re.sub(r'[^a-z\s]', '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 # Load the trained model from file
@@ -22,8 +19,23 @@ def predict_malicious_email(subject, body):
     subject_clean = clean_text(subject)
     body_clean = clean_text(body)
     text = subject_clean + " " + body_clean
-    score = pipeline.predict_proba([text])[0, 1]
-    return score
+
+    # Predict email maliciousness using the trained classifier
+    email_score = pipeline.predict_proba([text])[0, 1]
+    
+    # Extract all links from the original (uncleaned) email body
+    links = re.findall(r'(https?://\S+)', body)
+    if links:
+        # Get malicious score for each link using the external function
+        link_scores = [predict_malicious_url(link) for link in links]
+        # For combining, we use the maximum risk among all links
+        url_score = max(link_scores)
+    else:
+        url_score = 0.0
+
+    # Combine the scores using a weighted average:
+    combined_score = max(0.7 * email_score + 0.3 * url_score, email_score)
+    return combined_score
 
 # Example usage
 if __name__ == "__main__":
