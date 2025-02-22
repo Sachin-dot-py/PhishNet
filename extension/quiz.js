@@ -93,10 +93,12 @@ function renderQuiz(data) {
         const message = validateAnswer(true) ? "Correct! This message is malicious." : "Incorrect! This message is not malicious.";
         alert(message);
 
-        if (validateAnswer(true))
+        if (validateAnswer(true)) {
             enableHighlighting(reportButtonsContainer);
-        else
-            await renderNextQuestion();
+            return;
+        }
+        
+        await renderNextQuestion();
     };
 
     const notMaliciousButton = createElement("button", "Report as Not Malicious", {
