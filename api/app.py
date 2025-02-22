@@ -14,12 +14,37 @@ QUESTIONS = [
 ]
 
 @app.route('/api/game/question/starter', methods=['GET'])
-def get_single_question():
+def get_multiple_questions():
+    """
+    Returns a list of three random questions.
+    JSON Response Format:
+    [
+        {
+            "id": int,
+            "type": str,
+            "content": str (if type is "message" or "tweet"),
+            "subject": str (if type is "email"),
+            "body": str (if type is "email")
+        },
+        ...
+    ]
+    """
     questions = random.sample(QUESTIONS, 3)
     return jsonify(questions)
 
 @app.route('/api/game/question/lazy_loading', methods=['GET'])
-def get_multiple_questions():
+def get_single_question():
+    """
+    Returns a single random question.
+    JSON Response Format:
+    {
+        "id": int,  # Unique identifier for the question
+        "type": str,  # One of "message", "tweet", or "email"
+        "content": str (if type is "message" or "tweet"),
+        "subject": str (if type is "email"),
+        "body": str (if type is "email")
+    }
+    """
     question = random.choice(QUESTIONS)
     return jsonify(question)
 
