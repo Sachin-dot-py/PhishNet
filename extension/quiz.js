@@ -3,112 +3,139 @@ const buttonThemeColor = "#e30000";
 const greenButton = "#09b852";
 
 let questionDeque = [];
-let quizContainer; // Container to hold quiz content
+let quizContainer;
+let selectedWords = new Set();
+let highlightEnabled = false;
 
-// Function to fetch questions from the API
+// Fetch questions from API
 async function fetchQuestions() {
     const response = await fetch(`${AWS_LINK}/api/game/question/starter`);
     const questions = await response.json();
-    questionDeque = questions; // Initialize the deque with the fetched questions
+    questionDeque = questions;
 }
 
-// Function to enqueue new questions
+// Load more questions if needed
 async function loadMoreQuestions() {
     const response = await fetch(`${AWS_LINK}/api/game/question/lazy_loading`);
     const questions = await response.json();
-    questionDeque.push(...questions); // Add new questions to the deque
+    questionDeque.push(...questions);
 }
 
-// Function to render a question
+// Render the next question
 async function renderNextQuestion() {
     if (questionDeque.length === 0) {
-        await loadMoreQuestions(); // Load more questions if the deque is empty
+        await loadMoreQuestions();
     }
-    const questionData = questionDeque.shift(); // Dequeue the first question
+    const questionData = questionDeque.shift();
 
     if (!questionData) {
-        console.error('No question data available to render');
+        console.error("No question data available to render");
         return;
     }
 
-    console.log('Rendering question data:', questionData); // Debug log to check question data
-    clearQuizContainer(); // Clear previous question
-    renderQuiz(questionData); // Render the question
+    console.log("Rendering question data:", questionData);
+    highlightEnabled = false; // Reset highlighting for new question
+    selectedWords.clear(); // Clear previous selections
+    clearQuizContainer();
+    renderQuiz(questionData);
 }
 
-// Function to clear the quiz container
+// Clear quiz container
 function clearQuizContainer() {
     if (quizContainer) {
-        quizContainer.innerHTML = ''; // Clear the container
+        quizContainer.innerHTML = "";
     }
 }
 
-// Function to render the quiz content based on the data type.
+// Render quiz content
 function renderQuiz(data) {
-    const { type, subject, body, content, malicious } = data; // Include malicious property
+    const { type, subject, body, content, malicious } = data;
 
-    // Create a new quiz container if it doesn't exist
     if (!quizContainer) {
-        quizContainer = createElement('div', '', { margin: '10px auto' });
+        quizContainer = createElement("div", "", { margin: "10px auto" });
         document.body.appendChild(quizContainer);
     }
 
-    // Render the question based on its type
     switch (type) {
-        case "email": Email(subject, body); break;
-        case "tweet": Tweet(content); break;
-        case "message": SMS(content); break;
-        default: throw new Error(`Data type mismatched: renderQuiz does not know what ${type} is.`);
+        case "email":
+            Email(subject, body);
+            break;
+        case "tweet":
+            Tweet(content);
+            break;
+        case "message":
+            SMS(content);
+            break;
+        default:
+            throw new Error(`Unknown data type: ${type}`);
     }
 
-    // Create buttons for reporting
-    const reportButtonsContainer = createElement('div', '', { margin: '10px auto', textAlign: 'center' });
+    // Buttons container
+    const reportButtonsContainer = createElement("div", "", { margin: "10px auto", textAlign: "center" });
 
-    const maliciousButton = createElement('button', 'Report as Malicious', {
+    const maliciousButton = createElement("button", "Report as Malicious", {
         backgroundColor: buttonThemeColor,
-        color: 'white',
-        border: 'none',
-        borderRadius: '980px',
-        padding: '10px 20px',
-        margin: '0 5px',
-        cursor: 'pointer',
-        fontSize: '16px',
-        transition: 'background-color 0.3s',
+        color: "white",
+        border: "none",
+        borderRadius: "980px",
+        padding: "10px 20px",
+        margin: "0 5px",
+        cursor: "pointer",
+        fontSize: "16px",
+        transition: "background-color 0.3s",
     });
-    maliciousButton.style.cssText += 'box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);';
-    maliciousButton.onclick = async () => {
-        if (malicious) {
-            console.log('Correct! It is malicious.');
-        } else {
-            console.log('Wrong! It is not malicious.');
-        }
-        await renderNextQuestion(); // Render the next question after reporting
-    };
+    maliciousButton.onclick = () => enableHighlighting(reportButtonsContainer);
 
-    const notMaliciousButton = createElement('button', 'Report as Not Malicious', {
+    const notMaliciousButton = createElement("button", "Report as Not Malicious", {
         backgroundColor: greenButton,
-        color: 'white',
-        border: 'none',
-        borderRadius: '980px',
-        padding: '10px 20px',
-        margin: '0 5px',
-        cursor: 'pointer',
-        fontSize: '16px',
-        transition: 'background-color 0.3s',
+        color: "white",
+        border: "none",
+        borderRadius: "980px",
+        padding: "10px 20px",
+        margin: "0 5px",
+        cursor: "pointer",
+        fontSize: "16px",
+        transition: "background-color 0.3s",
     });
     notMaliciousButton.onclick = async () => {
-        if (!malicious) {
-            console.log('Correct! It is not malicious.');
-        } else {
-            console.log('Wrong! It is malicious.');
-        }
-        await renderNextQuestion(); // Render the next question after reporting
+        await renderNextQuestion();
     };
 
     reportButtonsContainer.appendChild(maliciousButton);
     reportButtonsContainer.appendChild(notMaliciousButton);
-    
-    quizContainer.appendChild(reportButtonsContainer); // Append buttons to the quiz container
+    quizContainer.appendChild(reportButtonsContainer);
+}
+
+// Enable highlighting and show submit button
+function enableHighlighting(reportButtonsContainer) {
+    highlightEnabled = true;
+    reportButtonsContainer.innerHTML = ""; // Remove previous buttons
+
+    const submitButton = createElement("button", "Submit", {
+        backgroundColor: buttonThemeColor,
+        color: "white",
+        border: "none",
+        borderRadius: "980px",
+        padding: "10px 20px",
+        margin: "0 auto",
+        cursor: "pointer",
+        fontSize: "16px",
+        transition: "background-color 0.3s",
+        display: "block",
+    });
+
+    submitButton.onclick = () => {
+        const orderedWords = getOrderedSelectedWords();
+        if (orderedWords.length === 0) {
+            alert("Selecting suspicious text is necessary.");
+            return; // Don't change the question if no text is selected
+        }
+        alert(orderedWords.join(" ")); // Alert selected words in order
+        clearQuizContainer();
+        renderNextQuestion();
+    };
+
+    quizContainer.appendChild(submitButton);
 }
 
 // Function to create elements
@@ -126,79 +153,108 @@ function Email(subjectContent, bodyContent) {
         borderRadius: "10px",
         padding: "10px",
         margin: "10px auto",
-        backgroundColor: "#1c1c1e", // Dark mode background
+        backgroundColor: "#1c1c1e",
         color: "#fff",
         width: "85%",
-        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)"
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)",
     });
 
     const sender = createElement("p", "Major League Hacking", { margin: "0 0 5px" });
     const subject = createElement("p", subjectContent, { fontWeight: "bold", fontSize: "18px", margin: "5px 0" });
     const hr = createElement("hr", "", { borderColor: "rgb(255, 255, 255)", margin: "5px 0" });
-    const br = createElement("br");
-    const body = createElement("p", bodyContent, { fontSize: "14px" });
+    const body = createElement("p", "", { fontSize: "14px" });
+
+    body.innerHTML = wrapTextInSpans(bodyContent);
+    body.dataset.originalText = bodyContent;
+    body.addEventListener("click", toggleHighlight);
 
     frame.appendChild(sender);
     frame.appendChild(subject);
     frame.appendChild(hr);
-    frame.appendChild(br);
     frame.appendChild(body);
 
-    quizContainer.appendChild(frame); // Append the email frame to the quiz container
+    quizContainer.appendChild(frame);
 }
 
 // Tweet rendering function
-const twitterUsernames = [
-    "BreadPitt", "NotAFBIagent", "TeaRexRoars", "ShrekOnMain",
-    "GhostedAgain", "404UsernameNotFound", "GuacwardAF", "ElonMuskRat",
-    "DankSinatra", "BezosBeGone"
-];
-
 function Tweet(content) {
+    const funnyUsernames = [
+        "DrunkShakespeare",
+        "LordOfTheMemes",
+        "ToiletPaperCEO",
+        "ElonMusketeer",
+        "404UsernameNotFound",
+        "BoredAndScrolling",
+        "OopsIDidItAgain",
+        "SarcasmOverdose",
+        "WiFiGoneAgain",
+        "ProcrastinationKing"
+    ];
+
+    const randomUsername = funnyUsernames[Math.floor(Math.random() * funnyUsernames.length)];
+    const twitterHandle = `@${randomUsername.toLowerCase().replace(/\s/g, "_")}`;
+    const randomMinutesAgo = Math.floor(Math.random() * 1440); // Random time within 24 hours
+
     const frame = createElement("div", "", {
         border: "1px solid #2c2f33",
-        backgroundColor: "#23272a",
-        padding: "10px",
+        backgroundColor: "#000",
+        padding: "15px",
         margin: "10px auto",
         color: "#ffffff",
-        boxShadow: "0 1px 2px rgba(0, 0, 0, 0.3)",
-        width: "85%"
+        width: "85%",
+        borderRadius: "10px",
+        fontFamily: "Arial, sans-serif",
+        boxShadow: "0 2px 4px rgba(0, 0, 0, 0.3)",
     });
 
-    const header = createElement("div", "", {
-        display: "flex",
-        alignItems: "center",
-        margin: "0 0 5px"
+    const header = createElement("div", "", { display: "flex", alignItems: "center", marginBottom: "10px" });
+
+    const profilePic = createElement("div", "", {
+        width: "40px",
+        height: "40px",
+        borderRadius: "50%",
+        backgroundColor: "#444",
+        marginRight: "10px",
+        backgroundImage: `url('https://i.pravatar.cc/40?u=${randomUsername}')`, // Random profile pic
+        backgroundSize: "cover",
     });
 
-    const username = createElement("p", twitterUsernames[Math.floor(Math.random() * twitterUsernames.length)], {
-        fontWeight: "bold",
-        color: "#1da1f2",
-        margin: "0"
-    });
-
-    const timestamp = createElement("p", "• Just now", {
-        fontSize: "12px",
-        color: "#b9bbbe",
+    const userInfo = createElement("div", "");
+    const name = createElement("p", randomUsername, { fontWeight: "bold", margin: "0", fontSize: "14px" });
+    const handle = createElement("p", `${twitterHandle} · ${randomMinutesAgo}m`, {
+        color: "#8899a6",
         margin: "0",
-        marginLeft: "5px" // Small left margin for spacing
+        fontSize: "12px",
     });
 
-    header.appendChild(username);
-    header.appendChild(timestamp);
+    userInfo.appendChild(name);
+    userInfo.appendChild(handle);
+    header.appendChild(profilePic);
+    header.appendChild(userInfo);
 
-    const contentElement = createElement("p", content, { margin: "5px 0" });
+    const contentElement = createElement("p", "", { margin: "5px 0", fontSize: "15px", lineHeight: "1.5" });
+    contentElement.innerHTML = wrapTextInSpans(content);
+    contentElement.dataset.originalText = content;
+    contentElement.addEventListener("click", toggleHighlight);
+
+    const actions = createElement("div", "", {
+        display: "flex",
+        justifyContent: "space-between",
+        marginTop: "10px",
+        color: "#8899a6",
+        fontSize: "14px",
+    });
 
     frame.appendChild(header);
     frame.appendChild(contentElement);
-
-    quizContainer.appendChild(frame); // Append the tweet frame to the quiz container
+    frame.appendChild(actions);
+    quizContainer.appendChild(frame);
 }
 
 // SMS rendering function
 function SMS(content) {
-    const contentContainer = createElement('div', content, {
-        backgroundColor: "#333", // Gray for incoming messages
+    const contentContainer = createElement("div", "", {
+        backgroundColor: "#333",
         padding: "10px",
         maxWidth: "85%",
         borderRadius: "16px",
@@ -208,11 +264,48 @@ function SMS(content) {
         boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)",
         display: "inline-block",
         paddingRight: "30px",
-        marginLeft: "20px"
+        marginLeft: "20px",
     });
 
-    quizContainer.appendChild(contentContainer); // Append the SMS content to the quiz container
+    contentContainer.innerHTML = wrapTextInSpans(content);
+    contentContainer.dataset.originalText = content;
+    contentContainer.addEventListener("click", toggleHighlight);
+
+    quizContainer.appendChild(contentContainer);
 }
 
-// Fetch the initial questions
-fetchQuestions().then(renderNextQuestion); // Start by fetching questions and rendering the first one
+// Wrap words in spans for highlight toggling
+function wrapTextInSpans(text) {
+    return text
+        .split(" ")
+        .map(word => `<span style="cursor: pointer">${word} </span>`)
+        .join("");
+}
+
+// Toggle highlight
+function toggleHighlight(event) {
+    if (!highlightEnabled || event.target.tagName !== "SPAN") return;
+
+    const word = event.target.innerText.trim();
+    if (selectedWords.has(word)) {
+        selectedWords.delete(word);
+        event.target.style.backgroundColor = "transparent";
+        event.target.style.color = "white";
+    } else {
+        selectedWords.add(word);
+        event.target.style.backgroundColor = "white";
+        event.target.style.color = "black";
+    }
+}
+
+// Get selected words in original order
+function getOrderedSelectedWords() {
+    const textContainer = document.querySelector("[data-original-text]");
+    if (!textContainer) return [];
+
+    const originalWords = textContainer.dataset.originalText.split(" ");
+    return originalWords.filter(word => selectedWords.has(word));
+}
+
+// Fetch questions and render the first one
+fetchQuestions().then(renderNextQuestion);
