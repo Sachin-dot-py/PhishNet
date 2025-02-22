@@ -1,14 +1,11 @@
 html,
 body {
-    width: 1000px;
-    height: 1000px;
     background-color: black;
     color: white;
 }
 
 .navbar-header {
     overflow: hidden;
-    
 }
 
 .navbar-header a {
@@ -18,17 +15,47 @@ body {
     padding: 14px 16px;
     text-decoration: none;
     font-size: 17px;
+    color: gray;
 }
 
 .navbar-header a:hover {
-    background-color: #ddd;
-    color: black;
+    color: white;
 }
 
 .navbar-header a.active {
     color: white;
 }
 
-div#quiz {
+div#phish-net {
+    height: 100vh;
     display: none;
+}
+
+div#phish-net div.row {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, 0%);
+}
+
+h1#num-tracked {
+    color: white;
+    font-size: 84px;
+    display: inline;
+}
+
+p#num-info {
+    font-size: 22px;
+    color: gray;
+    display: inline;
+    position: relative;
+    top: -15px;
+    padding-left: 10px;
+}
+
+div#phish-net span {
+    display: block;
+    text-align: center;
 }
