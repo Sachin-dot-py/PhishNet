@@ -35,18 +35,20 @@ def get_multiple_questions():
 @app.route('/api/game/question/lazy_loading', methods=['GET'])
 def get_single_question():
     """
-    Returns a single random question.
+    Returns a list of a single random question.
     JSON Response Format:
-    {
-        "id": int,  # Unique identifier for the question
-        "type": str,  # One of "message", "tweet", or "email"
-        "content": str (if type is "message" or "tweet"), # Max 100 words
-        "subject": str (if type is "email"), # Max 15 words
-        "body": str (if type is "email") # Max 100 words
-    }
+    [
+        {
+            "id": int,  # Unique identifier for the question
+            "type": str,  # One of "message", "tweet", or "email"
+            "content": str (if type is "message" or "tweet"), # Max 100 words
+            "subject": str (if type is "email"), # Max 15 words
+            "body": str (if type is "email") # Max 100 words
+        }
+    ]
     """
     question = random.choice(QUESTIONS)
-    return jsonify(question)
+    return jsonify([question])
 
 @app.route('/api/game/getFeedback', methods=['POST'])
 def post_feedback():
