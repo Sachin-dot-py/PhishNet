@@ -2,6 +2,8 @@ html,
 body {
     background-color: black;
     color: white;
+    width: 800px;
+    height: 600px;
 }
 
 .navbar-header {

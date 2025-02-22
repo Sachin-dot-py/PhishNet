@@ -22,9 +22,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Set default active section
-    document.getElementById("phish-net").style.display = "none";
-    document.getElementById("quiz").style.display = "block";
-    resizeWindow(800, 200); // Set initial size
+    document.getElementById("phish-net").style.display = "block";
+    document.getElementById("quiz").style.display = "none";
+    resizeWindow(800, 600); // Set initial size
 });
 
 // Function to resize the window
