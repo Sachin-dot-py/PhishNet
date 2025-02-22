@@ -33,7 +33,6 @@ async function renderNextQuestion() {
         return;
     }
 
-    console.log("Rendering question data:", questionData);
     highlightEnabled = false; // Reset highlighting for new question
     selectedWords.clear(); // Clear previous selections
     clearQuizContainer();
@@ -125,12 +124,11 @@ function enableHighlighting(reportButtonsContainer) {
     });
 
     submitButton.onclick = () => {
-        const orderedWords = getOrderedSelectedWords();
-        if (orderedWords.length === 0) {
+        if (selectedWords.size === 0) {
             alert("Selecting suspicious text is necessary.");
-            return; // Don't change the question if no text is selected
+            return;
         }
-        alert(orderedWords.join(" ")); // Alert selected words in order
+        alert(getOrderedSelectedWords().join(" ")); // Alert selected words in order
         clearQuizContainer();
         renderNextQuestion();
     };
@@ -166,7 +164,8 @@ function Email(subjectContent, bodyContent) {
 
     body.innerHTML = wrapTextInSpans(bodyContent);
     body.dataset.originalText = bodyContent;
-    body.addEventListener("click", toggleHighlight);
+    body.addEventListener("mouseup", handleMouseUp);
+    body.addEventListener("mousedown", clearSelection);
 
     frame.appendChild(sender);
     frame.appendChild(subject);
@@ -176,7 +175,6 @@ function Email(subjectContent, bodyContent) {
     quizContainer.appendChild(frame);
 }
 
-// Tweet rendering function
 function Tweet(content) {
     const funnyUsernames = [
         "DrunkShakespeare",
@@ -235,7 +233,8 @@ function Tweet(content) {
     const contentElement = createElement("p", "", { margin: "5px 0", fontSize: "15px", lineHeight: "1.5" });
     contentElement.innerHTML = wrapTextInSpans(content);
     contentElement.dataset.originalText = content;
-    contentElement.addEventListener("click", toggleHighlight);
+    contentElement.addEventListener("mouseup", handleMouseUp);
+    contentElement.addEventListener("mousedown", clearSelection);
 
     const actions = createElement("div", "", {
         display: "flex",
@@ -269,7 +268,8 @@ function SMS(content) {
 
     contentContainer.innerHTML = wrapTextInSpans(content);
     contentContainer.dataset.originalText = content;
-    contentContainer.addEventListener("click", toggleHighlight);
+    contentContainer.addEventListener("mouseup", handleMouseUp);
+    contentContainer.addEventListener("mousedown", clearSelection);
 
     quizContainer.appendChild(contentContainer);
 }
@@ -278,24 +278,55 @@ function SMS(content) {
 function wrapTextInSpans(text) {
     return text
         .split(" ")
-        .map(word => `<span style="cursor: pointer">${word} </span>`)
+        .map(word => `<span style="cursor: pointer; transition: background-color 0.3s;">${word} </span>`)
         .join("");
 }
 
-// Toggle highlight
-function toggleHighlight(event) {
-    if (!highlightEnabled || event.target.tagName !== "SPAN") return;
+// Handle mouse up event to toggle highlight
+function handleMouseUp(event) {
+    if (!highlightEnabled) return;
 
-    const word = event.target.innerText.trim();
-    if (selectedWords.has(word)) {
-        selectedWords.delete(word);
-        event.target.style.backgroundColor = "transparent";
-        event.target.style.color = "white";
-    } else {
-        selectedWords.add(word);
-        event.target.style.backgroundColor = "white";
-        event.target.style.color = "black";
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+
+    const ranges = [];
+    for (let i = 0; i < selection.rangeCount; i++) {
+        ranges.push(selection.getRangeAt(i));
     }
+
+    const selectedTextSet = new Set();
+    ranges.forEach(range => {
+        const selectedText = range.toString().trim();
+        if (selectedText) {
+            const selectedWordsInRange = selectedText.split(/\s+/).filter(word => word.length > 0);
+            selectedWordsInRange.forEach(word => selectedTextSet.add(word));
+        }
+    });
+
+    const spans = document.querySelectorAll("span");
+    spans.forEach(span => {
+        const word = span.innerText.trim();
+        if (selectedTextSet.has(word)) {
+            // Toggle highlight
+            if (selectedWords.has(word)) {
+                selectedWords.delete(word);
+                span.style.backgroundColor = ""; // Remove highlight
+                span.style.color = ""; // Reset text color
+            } else {
+                selectedWords.add(word);
+                span.style.backgroundColor = "white"; // Highlight background color
+                span.style.color = "black"; // Highlight text color
+            }
+        }
+    });
+
+    selection.removeAllRanges(); // Clear selection after handling
+}
+
+// Clear selection on mouse down
+function clearSelection() {
+    const selection = window.getSelection();
+    selection.removeAllRanges();
 }
 
 // Get selected words in original order
