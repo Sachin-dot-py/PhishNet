@@ -197,20 +197,19 @@ function enableHighlighting(reportButtonsContainer) {
                     clearQuizContainer();
                     const alertDiv = document.getElementById("alert");
                     if (alertDiv) {
-                        alertDiv.style.display = "none"; // Hide the alert feedback
+                        alertDiv.remove(); // Remove the alert feedback
                     }
                     await renderNextQuestion();
                 };
 
                 quizContainer.appendChild(continueButton);
+                submitButton.style.display = "none"; // Hide submit button when continue button is visible
             }
         } catch (error) {
             console.error("Error submitting feedback:", error);
             renderAlert("An error occurred while submitting your response.", false);
         }
     };
-    
-
 
     quizContainer.appendChild(submitButton);
 }
