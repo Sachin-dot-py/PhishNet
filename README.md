@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="logo.png" width="25%" alt="Cognitio App">
+</p>
+
 # PhishNet
 Your AI-powered shield against phishing. Detect threats, learn with interactive quizzes, and stay safe from malicious texts, emails, tweets, and URLs—right from your browser.
 
