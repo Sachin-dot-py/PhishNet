@@ -1,25 +1,24 @@
+const AWS_LINK = "https://ba9cyigyp2.us-west-2.awsapprunner.com";
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "analyzeContent") {
-        console.log("Sending extracted content to API:", message.payload);
-
-        // API endpoint for analysis
-        const API_URL = "https://phishnet.tech/api/blocker/predictMalicious";
-
-        fetch(API_URL, {
+    if (message.action === "sendToAWS") {
+        fetch(`${AWS_LINK}/api/blocker/predictMalicious`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(message.payload)
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(message.requestBody)
         })
         .then(response => response.json())
         .then(data => {
-            console.log("API Response:", data);
-
-            // Send response back to content script
-            chrome.tabs.sendMessage(sender.tab.id, {
-                action: "displayAnalysis",
-                result: data
-            });
+            console.log("Response from AWS:", data);
+            sendResponse(data);
         })
-        .catch(error => console.error("API Error:", error));
+        .catch(error => {
+            console.error("Error sending request to AWS:", error);
+            sendResponse({ error: error.message });
+        });
+
+        return true; // Keeps sendResponse active for async operations
     }
 });

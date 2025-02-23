@@ -1,3 +1,4 @@
+const AWS_LINK = "https://ba9cyigyp2.us-west-2.awsapprunner.com";
 let lastEmail = { subject: null, content: null };
 
 function extractContentWithLinks(element) {
@@ -17,7 +18,7 @@ function extractContentWithLinks(element) {
         }
 
         if (node.nextSibling) {
-            content += "\n"; // Ensure proper line breaks between elements
+            content += "\n";
         }
     }
 
@@ -28,10 +29,8 @@ function extractContentWithLinks(element) {
 const observer = new MutationObserver(() => {
     const hostname = window.location.hostname;
 
-    // Handle X (Twitter)
     if (hostname.includes("x.com")) {
         const articles = document.querySelectorAll('article');
-
         if (articles.length > 0) {
             articles.forEach(article => {
                 let requestBody = {
@@ -41,12 +40,14 @@ const observer = new MutationObserver(() => {
                     subject: null
                 };
 
-                console.log(requestBody);
+                // Send request to background.js
+                chrome.runtime.sendMessage({ action: "sendToAWS", requestBody }, response => {
+                    renderFeedback(article, response.explanation);
+                });
             });
         }
     } 
     
-    // Handle Gmail
     else if (hostname.includes("mail.google.com")) {
         const emailSubject = document.querySelector('h2.hP');
         const emailBody = document.querySelector('div.a3s');
@@ -57,7 +58,6 @@ const observer = new MutationObserver(() => {
                 content: extractContentWithLinks(emailBody)
             };
 
-            // Check if the email is different from the last logged one
             if (
                 currentEmail.subject !== lastEmail.subject ||
                 currentEmail.content !== lastEmail.content
@@ -69,9 +69,11 @@ const observer = new MutationObserver(() => {
                     body: currentEmail.content
                 };
 
-                console.log(requestBody);
+                // Send request to background.js
+                chrome.runtime.sendMessage({ action: "sendToAWS", requestBody }, response => {
+                    renderFeedback(emailBody, response.explanation);
+                });
 
-                // Update last logged email
                 lastEmail = { ...currentEmail };
             }
         }
@@ -82,3 +84,40 @@ observer.observe(document, {
     childList: true,
     subtree: true
 });
+
+function renderFeedback(targetElement, message) {
+    if (!message) return;
+
+    let existingFeedback = targetElement.querySelector('.feedback-message');
+    
+    if (existingFeedback) {
+        existingFeedback.innerText = `⚠️ ${message}`;
+    } else {
+        let feedbackDiv = document.createElement('div');
+        feedbackDiv.className = 'feedback-message';
+        feedbackDiv.innerText = `⚠️ ${message}`;
+        
+        Object.assign(feedbackDiv.style, {
+            position: 'absolute', // Use absolute positioning
+            top: '10px', // Position it at the top
+            right: '10px', // Position it to the right
+            padding: '8px',
+            backgroundColor: '#ffebcc',
+            color: '#993d00',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            borderRadius: '4px',
+            border: '1px solid #ffb84d',
+            zIndex: '10000', // Ensure it's on top
+            maxWidth: '90%', // Prevent overflow
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)' // Add some shadow for better visibility
+        });
+
+        // Set the target element's position to relative if it's not already
+        if (getComputedStyle(targetElement).position === 'static') {
+            targetElement.style.position = 'relative';
+        }
+
+        targetElement.appendChild(feedbackDiv);
+    }
+}
