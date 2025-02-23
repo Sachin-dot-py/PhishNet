@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="logo.png" width="25%" alt="Cognitio App">
+    <img src="logo.png" width="25%" alt="PhishNet App">
 </p>
 
 # PhishNet
