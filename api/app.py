@@ -3,11 +3,15 @@ import os
 import requests
 import random
 from dotenv import load_dotenv
+from pymongo import MongoClient, UpdateOne
 from email_malicious import predict_malicious_email
 from tweet_malicious import predict_malicious_tweet
 
 load_dotenv()
 app = Flask(__name__)
+client = MongoClient(os.environ.get("MONGO_URI"))
+db = client.PhishNet
+questions_collection = db.questions
 
 ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
 AUTH_TOKEN = os.environ.get("CLOUDFLARE_AUTH_TOKEN")
@@ -41,6 +45,19 @@ def get_multiple_questions():
     ]
     """
     questions = random.sample(QUESTIONS, 3)
+
+    bulk_ops = [
+        UpdateOne(
+            {"id": question["id"]},
+            {"$set": question},
+            upsert=True
+        )
+        for question in questions
+    ]
+    
+    if bulk_ops:
+        questions_collection.bulk_write(bulk_ops)
+    
     return jsonify(questions)
 
 @app.route('/api/game/question/lazy_loading', methods=['GET'])
@@ -60,6 +77,11 @@ def get_single_question():
     ]
     """
     question = random.choice(QUESTIONS)
+    questions_collection.update_one(
+        {"id": question["id"]},
+        {"$set": question},
+        upsert=True
+    )
     return jsonify([question])
 
 @app.route('/api/game/getFeedback', methods=['POST'])
@@ -87,9 +109,9 @@ def post_feedback():
     words = data.get("wordsList", [])
     wordsListSubject = data.get("wordsListSubject", [])
     wordsListBody = data.get("wordsListBody", [])
-    
-    # Fetch the question details by ID
-    question = next((q for q in QUESTIONS if q["id"] == question_id), None)
+
+    # Retrieve the question details from MongoDB using the id
+    question = questions_collection.find_one({"id": question_id})
     if not question:
         return jsonify({"error": "Invalid question ID"}), 400
     
