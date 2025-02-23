@@ -1,42 +1,60 @@
 let lastEmail = { subject: null, content: null };
 
-const observer = new MutationObserver((mutations, obs) => {
-    const hostname = window.location.hostname;
-    const articles = document.querySelectorAll('article');
+function extractContentWithLinks(element) {
+    let content = "";
 
-    if (hostname.includes("x.com") && articles.length > 0) {
-        articles.forEach(article => {
-            let requestBody = {
-                type: 'tweet',
-                content: null
-            };
-
-            // Extract lines from the tweet
-            let lines = article.innerText.split('\n');
-
-            // Remove first two lines (username and handle)
-            if (lines.length > 2) {
-                lines = lines.slice(2);
+    function traverseNodes(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            content += node.textContent;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.tagName === "A" && node.hasAttribute("href")) {
+                let href = node.getAttribute("href");
+                let text = node.textContent.trim();
+                content += `<a href="${href}">${text}</a>`;
+            } else {
+                node.childNodes.forEach(traverseNodes);
             }
+        }
 
-            // Remove timestamp (typically a date or "• Xh" format)
-            lines = lines.filter(line => !/^\s*·|^\d{1,2}[mhd]$|^\w+ \d{1,2}$/.test(line));
+        if (node.nextSibling) {
+            content += "\n"; // Ensure proper line breaks between elements
+        }
+    }
 
-            // Remove excessive mentions (e.g., long lists of @usernames)
-            requestBody.content = lines.join(' ').trim();
+    element.childNodes.forEach(traverseNodes);
+    return content.trim();
+}
 
-            console.log(requestBody);
-        });
+const observer = new MutationObserver(() => {
+    const hostname = window.location.hostname;
 
-        obs.disconnect(); // Stop observing once the articles are loaded
-    } else if (hostname.includes("mail.google.com")) {
+    // Handle X (Twitter)
+    if (hostname.includes("x.com")) {
+        const articles = document.querySelectorAll('article');
+
+        if (articles.length > 0) {
+            articles.forEach(article => {
+                let requestBody = {
+                    type: 'tweet',
+                    content: extractContentWithLinks(article),
+                    body: null,
+                    subject: null
+                };
+
+                console.log(requestBody);
+            });
+        }
+    } 
+    
+    // Handle Gmail
+    else if (hostname.includes("mail.google.com")) {
         const emailSubject = document.querySelector('h2.hP');
         const emailBody = document.querySelector('div.a3s');
 
         if (emailSubject && emailBody) {
             let currentEmail = {
                 subject: emailSubject.innerText.trim(),
-                content: emailBody.innerText.trim()
+                content: extractContentWithLinks(emailBody)
             };
 
             // Check if the email is different from the last logged one
@@ -54,7 +72,7 @@ const observer = new MutationObserver((mutations, obs) => {
                 console.log(requestBody);
 
                 // Update last logged email
-                lastEmail = currentEmail;
+                lastEmail = { ...currentEmail };
             }
         }
     }
