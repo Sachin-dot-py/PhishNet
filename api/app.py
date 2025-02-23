@@ -4,6 +4,7 @@ import requests
 import random
 from dotenv import load_dotenv
 from email_malicious import predict_malicious_email
+from tweet_malicious import predict_malicious_tweet
 
 load_dotenv()
 app = Flask(__name__)
@@ -136,6 +137,42 @@ def get_email_explanation(score, subject, body):
     explanation = result.get("result")
     return explanation
 
+def get_tweet_explanation(score, content):
+    if score > 0.7:
+        # Prompt for emails that appear malicious
+        prompt = (
+            "Analyze the following tweet content. "
+            "Based on research, tweets are often malicious if they sound too good to be true, exhibit urgent language, deal with money or prizes"
+            "suspicious links, grammatical errors, or unusual requests for sensitive info. "
+            "Provide a single, concise explanation (maximum 25 words) stating exactly which red flag(s) triggered the malicious score. "
+            "Output only the explanation text. "
+            f"Tweet Content: {content}"
+        )
+    else:
+        # Prompt for emails that appear safe
+        prompt = (
+            "Analyze the following tweet content. "
+            "Based on research, tweets are considered safe when they sound reasonable, lack urgent language, "
+            "suspicious links, grammatical errors, or unusual requests for sensitive info. "
+            "Provide a single, concise explanation (maximum 25 words) stating why the tweet appears safe. "
+            "Output only the explanation text. "
+            f"Tweet Content: {content}"
+        )
+    
+    response = requests.post(
+        LLM_API_URL,
+        headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+        json={
+            "messages": [
+                {"role": "system", "content": "You are an expert security assistant. You only have one chance to analyze the tweet and are only allowed to provide explanation text according to the specified requirements, with no context or follow up questions permited."},
+                {"role": "user", "content": prompt}
+            ]
+        }
+    )
+    result = response.json()
+    explanation = result.get("result")
+    return explanation
+
 @app.route('/api/blocker/predictMalicious', methods=['POST'])
 def predict_malicious():
     """
@@ -161,13 +198,9 @@ def predict_malicious():
     if data.get("type") == "email":
         score = predict_malicious_email(data.get("subject", ""), data.get("body", ""))
         explanation = get_email_explanation(score, data.get("subject", ""), data.get("body", ""))
-    else:
-        # For tweets, use a dummy score and explanation
-        score = random.randint(0, 1)
-        explanation = (
-            "The analysis indicates that the content is likely malicious." if score == 1 
-            else "The content appears to be safe."
-        )
+    elif data.get("type") == "tweet":
+        score = predict_malicious_tweet(data.get("content", ""))
+        explanation = get_tweet_explanation(score, data.get("content", ""))
 
     return jsonify({
         "score": score,
