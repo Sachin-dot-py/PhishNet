@@ -1,6 +1,31 @@
 const AWS_LINK = "https://ba9cyigyp2.us-west-2.awsapprunner.com";
 const endpoint = `${AWS_LINK}/api/blocker/predictMalicious`;
 
+function extractContentWithLinks(element) {
+    let content = "";
+
+    function traverseNodes(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            content += node.textContent;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.tagName === "A" && node.hasAttribute("href")) {
+                let href = node.getAttribute("href");
+                let text = node.textContent.trim();
+                content += `<a href="${href}">${text}</a>`;
+            } else {
+                node.childNodes.forEach(traverseNodes);
+            }
+        }
+
+        if (node.nextSibling) {
+            content += "\n";
+        }
+    }
+
+    element.childNodes.forEach(traverseNodes);
+    return content.trim();
+}
+
 if (window.location.hostname === 'x.com') {
     const processedTweets = new Set(); // Track processed tweet texts
 
@@ -37,6 +62,48 @@ if (window.location.hostname === 'x.com') {
         childList: true,
         subtree: true
     });
+} else if (window.location.hostname === 'mail.google.com') {
+    const processedEmails = new Set(); // Track processed email subjects
+    let lastEmail = { subject: null, content: null };
+
+    const observer = new MutationObserver(() => {
+        const emailSubject = document.querySelector('h2.hP');
+        const emailBody = document.querySelector('div.a3s');
+
+        if (emailSubject && emailBody) {
+            let currentEmail = {
+                subject: emailSubject.innerText.trim(),
+                content: extractContentWithLinks(emailBody)
+            };
+
+            // Only process the email if the subject has changed and it hasn't been processed
+            if (
+                currentEmail.subject !== lastEmail.subject &&
+                !processedEmails.has(currentEmail.subject)
+            ) {
+                processedEmails.add(currentEmail.subject); // Mark this email as processed
+
+                let requestBody = {
+                    type: 'email',
+                    subject: currentEmail.subject,
+                    content: currentEmail.content,
+                    body: currentEmail.content
+                };
+
+                // Send request to background.js
+                chrome.runtime.sendMessage({ action: "sendToAWS", requestBody }, response => {
+                    renderFeedback(emailBody, response.explanation); // Render feedback for this email
+                });
+
+                lastEmail = { ...currentEmail }; // Update the lastEmail object
+            }
+        }
+    });
+
+    observer.observe(document, {
+        childList: true,
+        subtree: true
+    });
 }
 
 // Function to render feedback
@@ -51,7 +118,7 @@ function renderFeedback(targetElement, message) {
     // Style the feedback component
     Object.assign(feedbackDiv.style, {
         position: 'absolute', // Set position to absolute
-        top: '10px', // Position it at the top
+        top: '2px', // Position it at the top
         right: '10px', // Position it to the right
         padding: '8px',
         backgroundColor: '#ffebcc',
@@ -70,6 +137,6 @@ function renderFeedback(targetElement, message) {
         targetElement.style.position = 'relative';
     }
 
-    // Append feedback div to the target tweet element
+    // Append feedback div to the target element
     targetElement.appendChild(feedbackDiv);
 }
