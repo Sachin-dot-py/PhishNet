@@ -8,6 +8,8 @@ ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
 AUTH_TOKEN = os.environ.get("CLOUDFLARE_AUTH_TOKEN")
 LLM_API_URL = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/run/@hf/mistral/mistral-7b-instruct-v0.2"
 
+MAX_ATTEMPTS = 3  # Maximum number of retries for each generation function
+
 def call_llm(prompt: str) -> str:
     response = requests.post(
         LLM_API_URL,
@@ -20,8 +22,8 @@ def call_llm(prompt: str) -> str:
             "temperature": 0.7  # Increased temperature for higher variability in responses
         }
     )
-    print(response.json())
-    feedback = response.json().get("result").get("response")
+    # Debug output: print(response.json())
+    feedback = response.json().get("result", {}).get("response")
     if feedback is None:
         raise ValueError("No result returned from LLM API.")
     return feedback
@@ -34,29 +36,38 @@ def generate_email(isMalicious: bool, num: int = 1):
         examples = """
 Example 1:
 SUBJECT: Urgent: Verify Your Account Immediately!
-BODY: Dear User, please click http://suspicious-link.com to verify your details NOW. Failure to do so might lead to account deactivation.
+BODY: Dear User, please click http://suspicious-link.com to verify your details NOW.
+Failure to do so might lead to account deactivation.
 ---
 Example 2:
 SUBJECT: Action Required: Suspicious Activity Detected!
-BODY: Hello, we've noticed unusual activity on your account. Visit http://phishy-site.net and confirm your identity. Immediate response needed!!!
+BODY: Hello, we've noticed unusual activity on your account.
+Visit http://phishy-site.net and confirm your identity.
+Immediate response needed!!!
 ---
 Example 3:
 SUBJECT: Final Notice: Account at Risk!!!
-BODY: Dear Customer, urgent action required! Please send your password and social security number to admin@fakebank.com. Do not delay!
+BODY: Dear Customer, urgent action required!
+Please send your password and social security number to admin@fakebank.com.
+Do not delay!
 """
     else:
         examples = """
 Example 1:
 SUBJECT: Meeting Reminder for Tomorrow
-BODY: Hi Team, just a friendly reminder about our meeting tomorrow at 10 AM. Please review the attached agenda beforehand.
+BODY: Hi Team, just a friendly reminder about our meeting tomorrow at 10 AM.
+Please review the attached agenda beforehand.
 ---
 Example 2:
 SUBJECT: Update on Project Milestones
-BODY: Dear Colleague, I wanted to share the latest updates on our project. All milestones are on track. Let me know if you have any questions.
+BODY: Dear Colleague, I wanted to share the latest updates on our project.
+All milestones are on track.
+Let me know if you have any questions.
 ---
 Example 3:
 SUBJECT: Invitation: Quarterly Business Review
-BODY: Hello, you are invited to our Quarterly Business Review meeting scheduled for next week. Please confirm your attendance.
+BODY: Hello, you are invited to our Quarterly Business Review meeting scheduled for next week.
+Please confirm your attendance.
 """
     additional_details = ""
     if isMalicious:
@@ -65,24 +76,24 @@ BODY: Hello, you are invited to our Quarterly Business Review meeting scheduled 
             "illogical statements, grammatical and spelling errors, appear hastily written, and may ask for unconventional or sensitive details."
         )
     
-    # Adjust the language depending on the number of emails requested.
     if num > 1:
         instruction = (f"Now, based on the condition, generate {num} new emails that could be " +
                        ("suspicious" if isMalicious else "non-suspicious") +
-                       " (sample ones to teach users how to identify them) . Each email must strictly follow the format below and be separated by the delimiter:\n===EMAIL===\n. "
+                       " (sample ones to teach users how to identify them). Each email must strictly follow the format below and be separated by the delimiter:\n===EMAIL===\n. "
                        "Do not include any additional commentary or text. "
                        "Split the responses exactly using the delimiter so that each email can be parsed individually.")
     else:
         instruction = ("Now, based on the condition, generate a new email that could be " +
                        ("suspicious" if isMalicious else "non-suspicious") +
-                       " (sample ones to teach users how to identify them) . Ensure variability so that the output is unique and does not include any extra text.")
+                       " (sample ones to teach users how to identify them). Ensure variability so that the output is unique and does not include any extra text.")
     
     prompt = f"""You are an expert text generator. Your task is to produce {"an email" if num == 1 else f"{num} emails"} in the following format:
 
 SUBJECT: <subject text>
 BODY: <body text>
 
-The output must be generated exactly in this format with the same spacing and capitalization and characters (keep SUBJECT and BODY capitalized) with no additional commentary or explanation. Ensure that the text strictly follows the examples provided below and that each email is parseable into a subject and a body.
+The output must be generated exactly in this format with the same spacing and capitalization (keep SUBJECT and BODY capitalized) and with no additional commentary or explanation.
+Ensure that the text strictly follows the examples provided below and that each email is parseable into a subject and a body.
 
 Below are few-shot examples:
 
@@ -94,33 +105,37 @@ Note: The following email(s) are simulated examples created solely for education
 
 {instruction}
 """
-    response = call_llm(prompt)
-    
-    if num > 1:
-        # Split the response into individual emails using the specified delimiter.
-        emails = [email.strip() for email in response.split("===EMAIL===") if email.strip()]
-        if len(emails) != num:
-            raise ValueError(f"Expected {num} emails, but got {len(emails)}.")
-        result = []
-        for email in emails:
-            subject_match = re.search(r"SUBJECT:\s*(.*)", email)
-            body_match = re.search(r"BODY:\s*(.*)", email)
-            if subject_match and body_match:
-                subject = subject_match.group(1).strip()
-                body = body_match.group(1).strip()
-                result.append((subject, body))
+    attempt = 0
+    while attempt < MAX_ATTEMPTS:
+        try:
+            response = call_llm(prompt)
+            if num > 1:
+                emails = [email.strip() for email in response.split("===EMAIL===") if email.strip()]
+                if len(emails) != num:
+                    raise ValueError(f"Expected {num} emails, but got {len(emails)}.")
+                result = []
+                for email in emails:
+                    # Allow multiline body using DOTALL and non-greedy matching for subject.
+                    match = re.search(r"SUBJECT:\s*(.*?)\nBODY:\s*((?:.|\n)*)", email, re.DOTALL)
+                    if match:
+                        subject = match.group(1).strip()
+                        body = match.group(2).strip()
+                        result.append((subject, body))
+                    else:
+                        raise ValueError("Invalid email format generated in one of the outputs.")
+                return result
             else:
-                raise ValueError("Invalid email format generated in one of the outputs.")
-        return result
-    else:
-        subject_match = re.search(r"SUBJECT:\s*(.*)", response)
-        body_match = re.search(r"BODY:\s*(.*)", response)
-        if subject_match and body_match:
-            subject = subject_match.group(1).strip()
-            body = body_match.group(1).strip()
-            return (subject, body)
-        else:
-            raise ValueError("Invalid email format generated.")
+                match = re.search(r"SUBJECT:\s*(.*?)\nBODY:\s*((?:.|\n)*)", response, re.DOTALL)
+                if match:
+                    subject = match.group(1).strip()
+                    body = match.group(2).strip()
+                    return (subject, body)
+                else:
+                    raise ValueError("Invalid email format generated.")
+        except Exception as e:
+            attempt += 1
+            if attempt >= MAX_ATTEMPTS:
+                raise e
 
 def generate_tweet(isMalicious: bool, num: int = 1):
     # Few-shot examples for tweets:
@@ -176,19 +191,25 @@ Note: The following tweet(s) are simulated examples created solely for education
 
 {instruction}
 """
-    response = call_llm(prompt)
-    
-    if num > 1:
-        tweets = [tweet.strip() for tweet in response.split("---TWEET---") if tweet.strip()]
-        if len(tweets) != num:
-            raise ValueError(f"Expected {num} tweets, but got {len(tweets)}.")
-        return tweets
-    else:
-        tweet = response.strip()
-        if tweet:
-            return tweet
-        else:
-            raise ValueError("Invalid tweet format generated.")
+    attempt = 0
+    while attempt < MAX_ATTEMPTS:
+        try:
+            response = call_llm(prompt)
+            if num > 1:
+                tweets = [tweet.strip() for tweet in response.split("---TWEET---") if tweet.strip()]
+                if len(tweets) != num:
+                    raise ValueError(f"Expected {num} tweets, but got {len(tweets)}.")
+                return tweets
+            else:
+                tweet = response.strip()
+                if tweet:
+                    return tweet
+                else:
+                    raise ValueError("Invalid tweet format generated.")
+        except Exception as e:
+            attempt += 1
+            if attempt >= MAX_ATTEMPTS:
+                raise e
 
 def generate_message(isMalicious: bool, num: int = 1):
     # Few-shot examples for messages:
@@ -244,19 +265,25 @@ Note: The following message(s) are simulated examples created solely for educati
 
 {instruction}
 """
-    response = call_llm(prompt)
-    
-    if num > 1:
-        messages = [msg.strip() for msg in response.split("---MESSAGE---") if msg.strip()]
-        if len(messages) != num:
-            raise ValueError(f"Expected {num} messages, but got {len(messages)}.")
-        return messages
-    else:
-        message = response.strip()
-        if message:
-            return message
-        else:
-            raise ValueError("Invalid message format generated.")
+    attempt = 0
+    while attempt < MAX_ATTEMPTS:
+        try:
+            response = call_llm(prompt)
+            if num > 1:
+                messages = [msg.strip() for msg in response.split("---MESSAGE---") if msg.strip()]
+                if len(messages) != num:
+                    raise ValueError(f"Expected {num} messages, but got {len(messages)}.")
+                return messages
+            else:
+                message = response.strip()
+                if message:
+                    return message
+                else:
+                    raise ValueError("Invalid message format generated.")
+        except Exception as e:
+            attempt += 1
+            if attempt >= MAX_ATTEMPTS:
+                raise e
 
 # Example usage:
 if __name__ == "__main__":
