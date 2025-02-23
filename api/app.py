@@ -2,10 +2,12 @@ from flask import Flask, request, jsonify
 import os
 import requests
 import random
+import uuid
 from dotenv import load_dotenv
 from pymongo import MongoClient, UpdateOne
 from email_malicious import predict_malicious_email
 from tweet_malicious import predict_malicious_tweet
+from generate_text import generate_email, generate_tweet, generate_message
 
 load_dotenv()
 app = Flask(__name__)
@@ -17,16 +19,6 @@ ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
 AUTH_TOKEN = os.environ.get("CLOUDFLARE_AUTH_TOKEN")
 LLM_API_URL = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/run/@cf/google/gemma-2b-it-lora"
 
-# Sample questions database
-QUESTIONS = [
-    {"id": 1, "type": "message", "content": "Hello, how are you?", "malicious": False},
-    {"id": 2, "type": "tweet", "content": "Breaking news! Major event happening now.", "malicious": True},
-    {"id": 3, "type": "email", "subject": "Urgent: Meeting Rescheduled", "body": "The meeting is rescheduled to tomorrow at 10 AM.", "malicious": False},
-    {"id": 4, "type": "tweet", "content": "I love programming in Python!", "malicious": False},
-    {"id": 5, "type": "message", "content": "Hey, can you call me back?", "malicious": True},
-    {"id": 6, "type": "email", "subject": "Job Offer", "body": "We are pleased to offer you a position at our company.", "malicious": False}
-]
-
 @app.route('/api/game/question/starter', methods=['GET'])
 def get_multiple_questions():
     """
@@ -34,17 +26,30 @@ def get_multiple_questions():
     JSON Response Format:
     [
         {
-            "id": int,
+            "id": str,  # A unique identifier for the question
             "type": str,
             "content": str (if type is "message" or "tweet"),
             "subject": str (if type is "email"),
             "body": str (if type is "email"),
-            "malicious": bool # Whether the text/tweet/email is malicious
+            "malicious": bool  # Whether the text/tweet/email is malicious
         },
         ...
     ]
     """
-    questions = random.sample(QUESTIONS, 3)
+    types = random.choices(["message", "tweet", "email"], k=3)
+    questions = []
+    for question_type in types:
+        isMalicious = random.choice([True, False])
+        new_id = str(uuid.uuid4())
+        if question_type == "message":
+            content = generate_message(isMalicious)
+            questions.append({"id": new_id, "type": question_type, "content": content, "malicious": isMalicious})
+        elif question_type == "tweet":
+            content = generate_tweet(isMalicious)
+            questions.append({"id": new_id, "type": question_type, "content": content, "malicious": isMalicious})
+        elif question_type == "email":
+            subject, body = generate_email(isMalicious)
+            questions.append({"id": new_id, "type": question_type, "subject": subject, "body": body, "malicious": isMalicious})
 
     bulk_ops = [
         UpdateOne(
@@ -63,20 +68,32 @@ def get_multiple_questions():
 @app.route('/api/game/question/lazy_loading', methods=['GET'])
 def get_single_question():
     """
-    Returns a list of a single random question.
+    Returns a list containing a single random question.
     JSON Response Format:
     [
         {
-            "id": int,  # Unique identifier for the question
+            "id": str,  # Unique identifier for the question
             "type": str,  # One of "message", "tweet", or "email"
             "content": str (if type is "message" or "tweet"), # Max 100 words
             "subject": str (if type is "email"), # Max 15 words
             "body": str (if type is "email") # Max 100 words,
-            "malicious": bool # Whether the text/tweet/email is malicious
+            "malicious": bool  # Whether the text/tweet/email is malicious
         }
     ]
     """
-    question = random.choice(QUESTIONS)
+    type_ = random.choice(["message", "tweet", "email"])
+    isMalicious = random.choice([True, False])
+    new_id = str(uuid.uuid4())
+    if type_ == "message":
+        content = generate_message(isMalicious)
+        question = {"id": new_id, "type": type_, "content": content, "malicious": isMalicious}
+    elif type_ == "tweet":
+        content = generate_tweet(isMalicious)
+        question = {"id": new_id, "type": type_, "content": content, "malicious": isMalicious}
+    elif type_ == "email":
+        subject, body = generate_email(isMalicious)
+        question = {"id": new_id, "type": type_, "subject": subject, "body": body, "malicious": isMalicious}
+    
     questions_collection.update_one(
         {"id": question["id"]},
         {"$set": question},
@@ -90,7 +107,7 @@ def post_feedback():
     Receives user feedback on whether a question is malicious.
     Expected JSON Request:
     {
-        "id": int,  # The question ID
+        "id": str,  # The question ID
         "userMalicious": bool,  # User's determination of maliciousness
         "wordsList": list (if type is "message" or "tweet"),
         "wordsListSubject": list (if type is "email"),
@@ -100,7 +117,7 @@ def post_feedback():
     JSON Response:
     {
         "feedback": str,  # Response feedback message
-        "correct": bool  # Whether the user was correct
+        "correct": bool   # Whether the user was correct
     }
     """
     data = request.get_json()
@@ -121,7 +138,6 @@ def post_feedback():
         feedback = "Correct! Well done."
         return jsonify({"feedback": feedback, "correct": True})
 
-    # Build the prompt string that will be sent to the LLM
     def ordinal(n):
         # Returns the ordinal representation for an integer n (1 -> "1st", 2 -> "2nd", etc.)
         if 10 <= n % 100 <= 20:
@@ -134,23 +150,18 @@ def post_feedback():
     subject_words = question['subject'].split()
     body_words = question['body'].split()
 
-    # Format selected words from the subject using their indices in wordsListSubject.
     selected_subject_words = []
     for idx in wordsListSubject:
-        # Adjusting for human-readable ordinal (assuming indices are zero-based)
         position = ordinal(idx + 1)
-        # Safely get the word if index is valid
         word = subject_words[idx] if idx < len(subject_words) else "<invalid index>"
         selected_subject_words.append(f"the {position} \"{word}\"")
 
-    # Format selected words from the body using their indices in wordsListBody.
     selected_body_words = []
     for idx in wordsListBody:
         position = ordinal(idx + 1)
         word = body_words[idx] if idx < len(body_words) else "<invalid index>"
         selected_body_words.append(f"the {position} \"{word}\"")
 
-    # Combine both lists into one descriptive string.
     if selected_subject_words and selected_body_words:
         selected_words_description = (
             "Subject: " + ", ".join(selected_subject_words) + 
@@ -163,7 +174,6 @@ def post_feedback():
     else:
         selected_words_description = "None"
 
-    # Construct the final prompt
     prompt = f"""
     Email Details:
     ---------------
@@ -195,16 +205,13 @@ def post_feedback():
     
     feedback = response.json().get("result").get("response")
     
-    response = {
+    return jsonify({
         "feedback": feedback,
         "correct": malicious == userMalicious
-    }
-
-    return jsonify(response)
+    })
 
 def get_email_explanation(score, subject, body):
     if score > 0.7:
-        # Prompt for emails that appear malicious
         prompt = (
             "Analyze the following email subject and body. "
             "Based on research, emails are often malicious if they exhibit urgent language, mismatched sender details, "
@@ -214,7 +221,6 @@ def get_email_explanation(score, subject, body):
             f"Subject: {subject} Body: {body}"
         )
     else:
-        # Prompt for emails that appear safe
         prompt = (
             "Analyze the following email subject and body. "
             "Based on research, emails are considered safe when they lack urgent language, mismatched sender details, "
@@ -240,17 +246,15 @@ def get_email_explanation(score, subject, body):
 
 def get_tweet_explanation(score, content):
     if score > 0.7:
-        # Prompt for emails that appear malicious
         prompt = (
             "Analyze the following tweet content. "
-            "Based on research, tweets are often malicious if they sound too good to be true, exhibit urgent language, deal with money or prizes"
+            "Based on research, tweets are often malicious if they sound too good to be true, exhibit urgent language, deal with money or prizes, "
             "suspicious links, grammatical errors, or unusual requests for sensitive info. "
             "Provide a single, concise explanation (maximum 25 words) stating exactly which red flag(s) triggered the malicious score. "
             "Output only the explanation text. "
             f"Tweet Content: {content}"
         )
     else:
-        # Prompt for emails that appear safe
         prompt = (
             "Analyze the following tweet content. "
             "Based on research, tweets are considered safe when they sound reasonable, lack urgent language, "

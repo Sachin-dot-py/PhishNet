@@ -16,7 +16,14 @@ def call_llm(prompt: str) -> str:
         headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
         json={
             "messages": [
-                {"role": "system", "content": "You are an expert cybersecurity educator specializing in email security training. Your task is to generate simulated examples of suspicious texts strictly for educational and research purposes to help users learn how to identify and protect against these threats."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert cybersecurity educator specializing in email security training. "
+                        "Your task is to generate simulated examples of suspicious texts strictly for educational "
+                        "and research purposes to help users learn how to identify and protect against these threats."
+                    )
+                },
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7  # Increased temperature for higher variability in responses
@@ -28,7 +35,7 @@ def call_llm(prompt: str) -> str:
         raise ValueError("No result returned from LLM API.")
     return feedback
 
-def generate_email(isMalicious: bool, num: int = 1):
+def generate_email(isMalicious: bool):
     # Few-shot examples for emails in the expected format:
     # SUBJECT: <subject text>
     # BODY: <body text>
@@ -76,24 +83,17 @@ Please confirm your attendance.
             "illogical statements, grammatical and spelling errors, appear hastily written, and may ask for unconventional or sensitive details."
         )
     
-    if num > 1:
-        instruction = (f"Now, based on the condition, generate {num} new emails that could be " +
-                       ("suspicious" if isMalicious else "non-suspicious") +
-                       " (sample ones to teach users how to identify them). Each email must strictly follow the format below and be separated by the delimiter:\n===EMAIL===\n. "
-                       "Do not include any additional commentary or text. "
-                       "Split the responses exactly using the delimiter so that each email can be parsed individually.")
-    else:
-        instruction = ("Now, based on the condition, generate a new email that could be " +
-                       ("suspicious" if isMalicious else "non-suspicious") +
-                       " (sample ones to teach users how to identify them). Ensure variability so that the output is unique and does not include any extra text.")
+    instruction = ("Now, based on the condition, generate a new email that could be " +
+                   ("suspicious" if isMalicious else "non-suspicious") +
+                   " (sample ones to teach users how to identify them). Ensure variability so that the output is unique and does not include any extra text. There must be only ONE email generated. Do not mention the examples.")
     
-    prompt = f"""You are an expert text generator. Your task is to produce {"an email" if num == 1 else f"{num} emails"} in the following format:
+    prompt = f"""You are an expert text generator. Your task is to produce an email in the following format:
 
 SUBJECT: <subject text>
 BODY: <body text>
 
 The output must be generated exactly in this format with the same spacing and capitalization (keep SUBJECT and BODY capitalized) and with no additional commentary or explanation.
-Ensure that the text strictly follows the examples provided below and that each email is parseable into a subject and a body.
+Ensure that the text strictly follows the examples provided below and that it is parseable into a subject and a body.
 
 Below are few-shot examples:
 
@@ -101,7 +101,7 @@ Below are few-shot examples:
 
 {additional_details}
 
-Note: The following email(s) are simulated examples created solely for educational purposes to demonstrate how suspicious communications might appear. They are not intended to be used for any real harmful activities.
+Note: The following email is a simulated example created solely for educational purposes to demonstrate how suspicious communications might appear. It is not intended to be used for any real harmful activities.
 
 {instruction}
 """
@@ -109,35 +109,19 @@ Note: The following email(s) are simulated examples created solely for education
     while attempt < MAX_ATTEMPTS:
         try:
             response = call_llm(prompt)
-            if num > 1:
-                emails = [email.strip() for email in response.split("===EMAIL===") if email.strip()]
-                if len(emails) != num:
-                    raise ValueError(f"Expected {num} emails, but got {len(emails)}.")
-                result = []
-                for email in emails:
-                    # Allow multiline body using DOTALL and non-greedy matching for subject.
-                    match = re.search(r"SUBJECT:\s*(.*?)\nBODY:\s*((?:.|\n)*)", email, re.DOTALL)
-                    if match:
-                        subject = match.group(1).strip()
-                        body = match.group(2).strip()
-                        result.append((subject, body))
-                    else:
-                        raise ValueError("Invalid email format generated in one of the outputs.")
-                return result
+            match = re.search(r"SUBJECT:\s*(.*?)\nBODY:\s*((?:.|\n)*)", response, re.DOTALL)
+            if match:
+                subject = match.group(1).strip()
+                body = match.group(2).strip()
+                return (subject, body)
             else:
-                match = re.search(r"SUBJECT:\s*(.*?)\nBODY:\s*((?:.|\n)*)", response, re.DOTALL)
-                if match:
-                    subject = match.group(1).strip()
-                    body = match.group(2).strip()
-                    return (subject, body)
-                else:
-                    raise ValueError("Invalid email format generated.")
+                raise ValueError("Invalid email format generated.")
         except Exception as e:
             attempt += 1
             if attempt >= MAX_ATTEMPTS:
                 raise e
 
-def generate_tweet(isMalicious: bool, num: int = 1):
+def generate_tweet(isMalicious: bool):
     # Few-shot examples for tweets:
     if isMalicious:
         examples = """
@@ -168,18 +152,12 @@ Example 3:
             "poor grammar, spelling mistakes, and may sound illogical or hastily written."
         )
     
-    if num > 1:
-        instruction = (f"Now, based on the condition, generate {num} new tweets that are " +
-                       ("suspicious" if isMalicious else "non-suspicious") +
-                       ". Each tweet should be exactly one line and must be separated by the delimiter:\n---TWEET---\n. "
-                       "Do not include any additional commentary or text. "
-                       "Split the responses exactly using the delimiter so that each tweet can be parsed individually.")
-    else:
-        instruction = ("Now, generate a new tweet that is " +
-                       ("suspicious" if isMalicious else "non-suspicious") +
-                       ". Ensure that the output is entirely the tweet text with no extra commentary.")
+    instruction = ("Now, generate a new tweet that is " +
+                   ("suspicious" if isMalicious else "non-suspicious") +
+                   ". Ensure that the output is entirely the tweet text with no extra commentary.")
     
-    prompt = f"""You are an expert text generator. Your task is to generate {"a tweet" if num == 1 else f"{num} tweets"} that are exactly one line of text each. Do not include any commentary or explanation—only the text of the tweet.
+    prompt = f"""You are an expert text generator. Your task is to generate a tweet that is exactly one line of text.
+Do not include any commentary or explanation—only the text of the tweet.
 
 Below are few-shot examples:
 
@@ -187,31 +165,24 @@ Below are few-shot examples:
 
 {additional_details}
 
-Note: The following tweet(s) are simulated examples created solely for educational purposes to demonstrate how suspicious communications might appear. They are not intended to be used for any real harmful activities.
+Note: The following tweet is a simulated example created solely for educational purposes to demonstrate how suspicious communications might appear. It is not intended to be used for any real harmful activities.
 
 {instruction}
 """
     attempt = 0
     while attempt < MAX_ATTEMPTS:
         try:
-            response = call_llm(prompt)
-            if num > 1:
-                tweets = [tweet.strip() for tweet in response.split("---TWEET---") if tweet.strip()]
-                if len(tweets) != num:
-                    raise ValueError(f"Expected {num} tweets, but got {len(tweets)}.")
-                return tweets
+            tweet = call_llm(prompt).strip()
+            if tweet:
+                return tweet
             else:
-                tweet = response.strip()
-                if tweet:
-                    return tweet
-                else:
-                    raise ValueError("Invalid tweet format generated.")
+                raise ValueError("Invalid tweet format generated.")
         except Exception as e:
             attempt += 1
             if attempt >= MAX_ATTEMPTS:
                 raise e
 
-def generate_message(isMalicious: bool, num: int = 1):
+def generate_message(isMalicious: bool):
     # Few-shot examples for messages:
     if isMalicious:
         examples = """
@@ -242,18 +213,11 @@ Example 3:
             "illogical statements, spelling and grammar mistakes, and may request unconventional or sensitive details."
         )
     
-    if num > 1:
-        instruction = (f"Now, based on the condition, generate {num} new messages that are " +
-                       ("suspicious" if isMalicious else "non-suspicious") +
-                       ". Each message should be a single plain text line and must be separated by the delimiter:\n---MESSAGE---\n. "
-                       "Do not include any additional commentary or text. "
-                       "Split the responses exactly using the delimiter so that each message can be parsed individually.")
-    else:
-        instruction = ("Now, generate a new message that is " +
-                       ("suspicious" if isMalicious else "non-suspicious") +
-                       ". Ensure the output is only the text of the message with no extra commentary.")
+    instruction = ("Now, generate a new message that is " +
+                   ("suspicious" if isMalicious else "non-suspicious") +
+                   ". Ensure the output is only the text of the message with no extra commentary.")
     
-    prompt = f"""You are an expert text generator. Your task is to generate {"a message" if num == 1 else f"{num} messages"} exactly as they would be sent to a user, with no additional commentary or formatting.
+    prompt = f"""You are an expert text generator. Your task is to generate a message exactly as it would be sent to a user, with no additional commentary or formatting.
 
 Below are few-shot examples:
 
@@ -261,25 +225,18 @@ Below are few-shot examples:
 
 {additional_details}
 
-Note: The following message(s) are simulated examples created solely for educational purposes to demonstrate how suspicious communications might appear. They are not intended to be used for any real harmful activities.
+Note: The following message is a simulated example created solely for educational purposes to demonstrate how suspicious communications might appear. It is not intended to be used for any real harmful activities.
 
 {instruction}
 """
     attempt = 0
     while attempt < MAX_ATTEMPTS:
         try:
-            response = call_llm(prompt)
-            if num > 1:
-                messages = [msg.strip() for msg in response.split("---MESSAGE---") if msg.strip()]
-                if len(messages) != num:
-                    raise ValueError(f"Expected {num} messages, but got {len(messages)}.")
-                return messages
+            message = call_llm(prompt).strip()
+            if message:
+                return message
             else:
-                message = response.strip()
-                if message:
-                    return message
-                else:
-                    raise ValueError("Invalid message format generated.")
+                raise ValueError("Invalid message format generated.")
         except Exception as e:
             attempt += 1
             if attempt >= MAX_ATTEMPTS:
@@ -288,30 +245,14 @@ Note: The following message(s) are simulated examples created solely for educati
 # Example usage:
 if __name__ == "__main__":
     # Generate a single non-malicious email
-    email_subject, email_body = generate_email(isMalicious=False, num=1)
+    email_subject, email_body = generate_email(isMalicious=False)
     print("Single Email Subject:", email_subject)
     print("Single Email Body:", email_body)
     
-    # Generate 2 malicious emails
-    emails = generate_email(isMalicious=True, num=2)
-    for i, (subject, body) in enumerate(emails, start=1):
-        print(f"\nMalicious Email {i} Subject:", subject)
-        print(f"Malicious Email {i} Body:", body)
-    
     # Generate a single malicious tweet
-    tweet = generate_tweet(isMalicious=True, num=1)
+    tweet = generate_tweet(isMalicious=True)
     print("\nSingle Malicious Tweet:", tweet)
     
-    # Generate 3 non-malicious tweets
-    tweets = generate_tweet(isMalicious=False, num=3)
-    for i, t in enumerate(tweets, start=1):
-        print(f"Non-Malicious Tweet {i}:", t)
-    
     # Generate a single non-malicious message
-    message = generate_message(isMalicious=False, num=1)
+    message = generate_message(isMalicious=False)
     print("\nSingle Non-Malicious Message:", message)
-    
-    # Generate 2 malicious messages
-    messages = generate_message(isMalicious=True, num=2)
-    for i, m in enumerate(messages, start=1):
-        print(f"Malicious Message {i}:", m)
