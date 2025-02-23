@@ -96,7 +96,7 @@ function renderQuiz(data) {
     });
     maliciousButton.onclick = async () => {
         const message = validateAnswer(true) ? "Correct! This message is malicious." : "Incorrect! This message is not malicious.";
-        alert(message);
+        renderAlert(message, validateAnswer(true));
 
         if (validateAnswer(true)) {
             enableHighlighting(reportButtonsContainer);
@@ -120,7 +120,7 @@ function renderQuiz(data) {
 
     notMaliciousButton.onclick = async () => {
         const message = validateAnswer(false) ? "Correct! This message is not malicious." : "Incorrect! This message is malicious.";
-        alert(message);
+        renderAlert(message, validateAnswer(false));
         await renderNextQuestion();
     };
 
@@ -146,21 +146,17 @@ function enableHighlighting(reportButtonsContainer) {
         transition: "background-color 0.3s",
         display: "block",
     });
-
     submitButton.onclick = async () => {
         if (selectedWords.size === 0) {
-            alert("Selecting suspicious text is necessary.");
+            renderAlert("Selecting suspicious text is necessary.", false);
             return;
         }
     
-        // Use the stored current question instead of questionDeque[0]
         const selectedWordsArray = getOrderedSelectedWords();
         const requestBody = {
-            id: window.currentQuestion?.id, // Use stored question reference
-            userMalicious: currentMaliciousState, // User's determination
+            id: window.currentQuestion?.id,
+            userMalicious: currentMaliciousState,
         };
-    
-        console.log(window.currentQuestion); // Now logs the correct question
     
         if (window.currentQuestion?.type === "email") {
             requestBody.wordsListSubject = selectedWordsArray;
@@ -168,7 +164,6 @@ function enableHighlighting(reportButtonsContainer) {
         } else {
             requestBody.wordsList = selectedWordsArray;
         }
-    
     
         try {
             const response = await fetch(`${AWS_LINK}/api/game/getFeedback`, {
@@ -178,14 +173,41 @@ function enableHighlighting(reportButtonsContainer) {
             });
     
             const responseData = await response.json();
-            alert(responseData.feedback);
+            const valid = !responseData.feedback.toLowerCase().startsWith("incorrect");
+            renderAlert(responseData.feedback, valid);
+
+            // Create continue button if it doesn't already exist
+            if (!document.getElementById("continueButton")) {
+                const continueButton = createElement("button", "Continue", {
+                    backgroundColor: "#007bff",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "980px",
+                    padding: "10px 20px",
+                    margin: "10px auto",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    transition: "background-color 0.3s",
+                    display: "block",
+                });
+                continueButton.id = "continueButton";
+
+                continueButton.onclick = async () => {
+                    continueButton.remove(); // Self destruct
+                    clearQuizContainer();
+                    const alertDiv = document.getElementById("alert");
+                    if (alertDiv) {
+                        alertDiv.style.display = "none"; // Hide the alert feedback
+                    }
+                    await renderNextQuestion();
+                };
+
+                quizContainer.appendChild(continueButton);
+            }
         } catch (error) {
             console.error("Error submitting feedback:", error);
-            alert("An error occurred while submitting your response.");
+            renderAlert("An error occurred while submitting your response.", false);
         }
-    
-        clearQuizContainer();
-        renderNextQuestion();
     };
     
 
@@ -393,6 +415,35 @@ function getOrderedSelectedWords() {
 
     const originalWords = textContainer.dataset.originalText.split(" ");
     return originalWords.filter(word => selectedWords.has(word));
+}
+
+
+function renderAlert(message, correct) {
+    let alertDiv = document.getElementById("alert");
+    const firstWord = message.split(" ")[0];
+    const restOfMessage = message.substring(firstWord.length);
+
+    const firstWordSpan = firstWord.includes("!") 
+        ? `<span style="color: ${correct ? 'green' : 'red'};">${firstWord}</span>`
+    : `<span style="color: white">${firstWord}</span>`;
+    const restOfMessageSpan = `<span style="color: white;">${restOfMessage}</span>`;
+
+    const formattedMessage = `${firstWordSpan}${restOfMessageSpan}`;
+
+    if (!alertDiv) {
+        alertDiv = createElement("div", "", {
+            borderTop: "1px solid rgb(255, 255, 255, 0.2)",
+            color: "black",
+            padding: "10px",
+            margin: "10px auto",
+            width: "85%",
+        });
+        alertDiv.id = "alert";
+        alertDiv.innerHTML = formattedMessage;
+        document.body.appendChild(alertDiv);
+    } else {
+        alertDiv.innerHTML = formattedMessage;
+    }
 }
 
 // Fetch questions and render the first one
