@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import random
+from email_malicious import predict_malicious_email
 
 app = Flask(__name__)
 
@@ -111,8 +112,15 @@ def predict_malicious():
     """
     data = request.get_json()
 
-    # Generate a random score (0 or 1) and a dummy explanation
-    score = random.randint(0, 1)
+    if data.get("type") not in ["message", "tweet", "email"]:
+        return jsonify({"error": "Invalid content type"}), 400
+    
+    if data.get("type") == "email":
+        score = predict_malicious_email(data.get("subject", ""), data.get("body", ""))
+    else:
+        # Generate a random score (0 or 1) and a dummy explanation
+        score = random.randint(0, 1)
+
     explanation = (
         "The analysis indicates that the content is likely "
         "malicious." if score == 1 else "The content appears to be safe."

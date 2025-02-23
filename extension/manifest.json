@@ -13,10 +13,10 @@
     "permissions": ["storage", "activeTab", "scripting"],
     "host_permissions": ["https://*/*"],
     "content_scripts": [
-        {
-            "matches": ["<all_urls>"],
-            "js": ["scripts/content.js"],
-            "run_at": "document_idle"
-        }
+    {
+        "matches": ["<all_urls>"],
+        "js": ["scripts/content.js"],
+        "run_at": "document_idle"
+    }
     ]
 }
