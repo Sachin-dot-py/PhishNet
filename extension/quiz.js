@@ -59,11 +59,11 @@ function clearQuizContainer() {
 
 // Render quiz content
 function renderQuiz(data) {
-    const { type, subject, body, content, malicious } = data;
+    const { type, subject, body, content } = data;
 
     if (!quizContainer) {
         quizContainer = createElement("div", "", { margin: "10px auto" });
-        document.body.appendChild(quizContainer);
+        document.getElementById("quiz").appendChild(quizContainer);
     }
 
     switch (type) {
@@ -117,7 +117,7 @@ function renderQuiz(data) {
             ? "Correct! This message is not malicious."
             : "Incorrect! This message is malicious.";
         renderAlert(message, validateAnswer(false));
-        // Remove report buttons and keep displaying the same question along with feedback.
+        // Remove report buttons but keep displaying the same question along with feedback.
         reportButtonsContainer.innerHTML = "";
         if (!document.getElementById("continueButton")) {
             const continueButton = createElement("button", "Continue", {
@@ -144,7 +144,8 @@ function renderQuiz(data) {
                 await renderNextQuestion();
             };
 
-            quizContainer.appendChild(continueButton);
+            // Insert the Continue button right after the feedback alert.
+            document.getElementById("alert").insertAdjacentElement("afterend", continueButton);
         }
     };
 
@@ -201,7 +202,6 @@ function enableHighlighting(reportButtonsContainer) {
             // Display the API feedback instead of a default message.
             renderAlert(responseData.feedback, valid);
     
-            // Create continue button if it doesn't already exist
             if (!document.getElementById("continueButton")) {
                 const continueButton = createElement("button", "Continue", {
                     backgroundColor: "#007bff",
@@ -227,7 +227,8 @@ function enableHighlighting(reportButtonsContainer) {
                     await renderNextQuestion();
                 };
     
-                quizContainer.appendChild(continueButton);
+                // Insert the Continue button right after the feedback alert.
+                document.getElementById("alert").insertAdjacentElement("afterend", continueButton);
                 submitButton.style.display = "none"; // Hide submit button when continue button is visible
             }
         } catch (error) {
@@ -267,8 +268,8 @@ function Email(subjectContent, bodyContent) {
 
     body.innerHTML = wrapTextInSpans(bodyContent);
     body.dataset.originalText = bodyContent;
-    body.addEventListener("mouseup", handleMouseUp);
-    body.addEventListener("mousedown", clearSelection);
+    // Attach click listener for toggling word selection.
+    attachClickHandlerToSpans(body);
 
     frame.appendChild(sender);
     frame.appendChild(subject);
@@ -336,8 +337,8 @@ function Tweet(content) {
     const contentElement = createElement("p", "", { margin: "5px 0", fontSize: "15px", lineHeight: "1.5" });
     contentElement.innerHTML = wrapTextInSpans(content);
     contentElement.dataset.originalText = content;
-    contentElement.addEventListener("mouseup", handleMouseUp);
-    contentElement.addEventListener("mousedown", clearSelection);
+    // Attach click listener for toggling word selection.
+    attachClickHandlerToSpans(contentElement);
 
     const actions = createElement("div", "", {
         display: "flex",
@@ -371,8 +372,8 @@ function SMS(content) {
 
     contentContainer.innerHTML = wrapTextInSpans(content);
     contentContainer.dataset.originalText = content;
-    contentContainer.addEventListener("mouseup", handleMouseUp);
-    contentContainer.addEventListener("mousedown", clearSelection);
+    // Attach click listener for toggling word selection.
+    attachClickHandlerToSpans(contentContainer);
 
     quizContainer.appendChild(contentContainer);
 }
@@ -385,51 +386,29 @@ function wrapTextInSpans(text) {
         .join("");
 }
 
-// Handle mouse up event to toggle highlight
-function handleMouseUp(event) {
+// New function to toggle word selection on click
+function toggleWordSelection(event) {
     if (!highlightEnabled) return;
-
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) return;
-
-    const ranges = [];
-    for (let i = 0; i < selection.rangeCount; i++) {
-        ranges.push(selection.getRangeAt(i));
+    const span = event.target;
+    if (span.tagName.toLowerCase() !== "span") return;
+    const word = span.innerText.trim();
+    if (selectedWords.has(word)) {
+        selectedWords.delete(word);
+        span.style.backgroundColor = "";
+        span.style.color = "";
+    } else {
+        selectedWords.add(word);
+        span.style.backgroundColor = "white";
+        span.style.color = "black";
     }
-
-    const selectedTextSet = new Set();
-    ranges.forEach(range => {
-        const selectedText = range.toString().trim();
-        if (selectedText) {
-            const selectedWordsInRange = selectedText.split(/\s+/).filter(word => word.length > 0);
-            selectedWordsInRange.forEach(word => selectedTextSet.add(word));
-        }
-    });
-
-    const spans = document.querySelectorAll("span");
-    spans.forEach(span => {
-        const word = span.innerText.trim();
-        if (selectedTextSet.has(word)) {
-            // Toggle highlight
-            if (selectedWords.has(word)) {
-                selectedWords.delete(word);
-                span.style.backgroundColor = "";
-                span.style.color = "";
-            } else {
-                selectedWords.add(word);
-                span.style.backgroundColor = "white";
-                span.style.color = "black";
-            }
-        }
-    });
-
-    selection.removeAllRanges();
 }
 
-// Clear selection on mouse down
-function clearSelection() {
-    const selection = window.getSelection();
-    selection.removeAllRanges();
+// Attach click event to all spans within a container
+function attachClickHandlerToSpans(container) {
+    const spans = container.querySelectorAll("span");
+    spans.forEach(span => {
+       span.addEventListener("click", toggleWordSelection);
+    });
 }
 
 // Get selected words in original order
@@ -456,15 +435,16 @@ function renderAlert(message, correct) {
 
     if (!alertDiv) {
         alertDiv = createElement("div", "", {
-            borderTop: "1px solid rgb(255, 255, 255, 0.2)",
+            borderTop: "1px solid rgba(255, 255, 255, 0.2)",
             color: "black",
             padding: "10px",
             margin: "10px auto",
             width: "85%",
         });
         alertDiv.id = "alert";
+        // Append alert to the quiz section so feedback stays with the quiz.
+        document.getElementById("quiz").appendChild(alertDiv);
         alertDiv.innerHTML = formattedMessage;
-        document.body.appendChild(alertDiv);
     } else {
         alertDiv.innerHTML = formattedMessage;
     }
@@ -482,7 +462,12 @@ const loadingScreen = createElement("div", "Loading Quiz...", {
     borderRadius: "10px",
     fontSize: "24px",
 });
-document.body.appendChild(loadingScreen);
+const quizSection = document.getElementById("quiz");
+if (quizSection) {
+    quizSection.appendChild(loadingScreen);
+} else {
+    document.body.appendChild(loadingScreen);
+}
 
 fetchQuestions().then(() => {
     loadingScreen.remove();
