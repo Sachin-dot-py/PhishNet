@@ -35,4 +35,4 @@ def predict_malicious_url_1(link: str) -> float:
 # Example usage:
 if __name__ == "__main__":
     test_url = "http://example.com/suspicious"
-    print(f"Malicious probability: {predict_malicious_url(test_url):.2f}")
+    print(f"Malicious probability: {predict_malicious_url_1(test_url):.2f}")
