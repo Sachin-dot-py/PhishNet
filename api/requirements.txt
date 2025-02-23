@@ -3,3 +3,6 @@ gunicorn
 pandas
 pymongo
 python-dotenv
+scikit-learn
+torch
+transformers
