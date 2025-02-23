@@ -193,13 +193,13 @@ def post_feedback():
         }
     )
     
-    feedback = response.json().get("result")
+    feedback = response.json().get("result").get("response")
     
     response = {
         "feedback": feedback,
         "correct": malicious == userMalicious
     }
-    
+
     return jsonify(response)
 
 def get_email_explanation(score, subject, body):
@@ -235,7 +235,7 @@ def get_email_explanation(score, subject, body):
         }
     )
     result = response.json()
-    explanation = result.get("result")
+    explanation = result.get("result").get("response")
     return explanation
 
 def get_tweet_explanation(score, content):
@@ -271,7 +271,7 @@ def get_tweet_explanation(score, content):
         }
     )
     result = response.json()
-    explanation = result.get("result")
+    explanation = result.get("result").get("response")
     return explanation
 
 @app.route('/api/blocker/predictMalicious', methods=['POST'])
