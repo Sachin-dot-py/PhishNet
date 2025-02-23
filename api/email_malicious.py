@@ -1,8 +1,8 @@
 import re
 import pickle
 import pandas as pd
-from api.url_malicious_1 import predict_malicious_url_1
-from api.url_malicious_2 import predict_malicious_url_2
+from url_malicious_1 import predict_malicious_url_1
+from url_malicious_2 import predict_malicious_url_2
 
 # Define the same text cleaning function
 def clean_text(text):
