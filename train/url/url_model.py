@@ -7,8 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
-#The dataset with just URLs and type --> url_dataset2.csv
-df = pd.read_csv("url_dataset2.csv")
+#The dataset with just URLs and type --> url_dataset.csv
+df = pd.read_csv("url_dataset.csv")
 
 def cleaning(url):
     url = url.lower()
