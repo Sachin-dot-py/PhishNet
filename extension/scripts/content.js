@@ -26,7 +26,7 @@ if (window.location.hostname === 'x.com') {
                     // Send request to background.js
                     chrome.runtime.sendMessage({ action: "sendToAWS", requestBody }, response => {
                         console.log(response); // Log the response from background.js
-                        renderFeedback(article, response.explanation); // Render feedback component
+                        renderFeedback(article, response.explanation); // Render feedback for this tweet
                     });
                 }
             }
@@ -39,7 +39,7 @@ if (window.location.hostname === 'x.com') {
     });
 }
 
-// Function to render feedback component
+// Function to render feedback
 function renderFeedback(targetElement, message) {
     if (!message) return;
 
@@ -47,24 +47,6 @@ function renderFeedback(targetElement, message) {
     let feedbackDiv = document.createElement('div');
     feedbackDiv.className = 'feedback-message';
     feedbackDiv.innerText = message;
-
-    // Create a close button
-    let closeButton = document.createElement('button');
-    closeButton.innerText = '✖';
-    closeButton.style.marginLeft = '10px';
-    closeButton.style.background = 'none';
-    closeButton.style.border = 'none';
-    closeButton.style.color = '#993d00';
-    closeButton.style.cursor = 'pointer';
-    closeButton.style.fontSize = '14px';
-
-    // Add click event to remove feedback div
-    closeButton.onclick = () => {
-        feedbackDiv.remove();
-    };
-
-    // Append close button to feedback div
-    feedbackDiv.appendChild(closeButton);
 
     // Style the feedback component
     Object.assign(feedbackDiv.style, {
@@ -91,5 +73,3 @@ function renderFeedback(targetElement, message) {
     // Append feedback div to the target tweet element
     targetElement.appendChild(feedbackDiv);
 }
-
-
