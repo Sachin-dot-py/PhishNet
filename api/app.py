@@ -117,12 +117,89 @@ def post_feedback():
     
     malicious = question["malicious"]
     
-    feedback = "Correct! Well done." if malicious == userMalicious else "Incorrect. Here's some feedback: Try analyzing the words more carefully."
+    if userMalicious == question["malicious"]:
+        feedback = "Correct! Well done."
+        return jsonify({"feedback": feedback, "correct": True})
+
+    # Build the prompt string that will be sent to the LLM
+    def ordinal(n):
+        # Returns the ordinal representation for an integer n (1 -> "1st", 2 -> "2nd", etc.)
+        if 10 <= n % 100 <= 20:
+            suffix = 'th'
+        else:
+            suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+        return f"{n}{suffix}"
+
+    # Extract words from the subject and body by splitting on whitespace.
+    subject_words = question['subject'].split()
+    body_words = question['body'].split()
+
+    # Format selected words from the subject using their indices in wordsListSubject.
+    selected_subject_words = []
+    for idx in wordsListSubject:
+        # Adjusting for human-readable ordinal (assuming indices are zero-based)
+        position = ordinal(idx + 1)
+        # Safely get the word if index is valid
+        word = subject_words[idx] if idx < len(subject_words) else "<invalid index>"
+        selected_subject_words.append(f"the {position} \"{word}\"")
+
+    # Format selected words from the body using their indices in wordsListBody.
+    selected_body_words = []
+    for idx in wordsListBody:
+        position = ordinal(idx + 1)
+        word = body_words[idx] if idx < len(body_words) else "<invalid index>"
+        selected_body_words.append(f"the {position} \"{word}\"")
+
+    # Combine both lists into one descriptive string.
+    if selected_subject_words and selected_body_words:
+        selected_words_description = (
+            "Subject: " + ", ".join(selected_subject_words) + 
+            "; Body: " + ", ".join(selected_body_words)
+        )
+    elif selected_subject_words:
+        selected_words_description = "Subject: " + ", ".join(selected_subject_words)
+    elif selected_body_words:
+        selected_words_description = "Body: " + ", ".join(selected_body_words)
+    else:
+        selected_words_description = "None"
+
+    # Construct the final prompt
+    prompt = f"""
+    Email Details:
+    ---------------
+    Subject: {question['subject']}
+    Body: {question['body']}
+    Malicious (ground truth): {question['malicious']}
+    User's Guess: {userMalicious}
+
+    The user selected the following words as red flags:
+    {selected_words_description}
+
+    Based on the email content and the user's selections, provide personalized feedback that explains:
+    - Why their guess (malicious or not) might be incorrect (if it is),
+    - What red flag words in the message contributed to making it suspicious,
+    and any brief insights that could help the user learn.
+    Your response should ONLY include the feedback message to be shown to the user.
+    """
+
+    response = requests.post(
+        LLM_API_URL,
+        headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+        json={
+            "messages": [
+                {"role": "system", "content": "You are an expert email security advisor."},
+                {"role": "user", "content": prompt}
+            ]
+        }
+    )
+    
+    feedback = response.json().get("result")
     
     response = {
         "feedback": feedback,
         "correct": malicious == userMalicious
     }
+    
     return jsonify(response)
 
 def get_email_explanation(score, subject, body):
