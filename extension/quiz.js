@@ -4,7 +4,7 @@ const greenButton = "#09b852";
 
 let questionDeque = [];
 let quizContainer;
-let selectedWords = new Set(); // Now stores indices (as strings) for uniqueness
+let selectedWords = new Set(); // Now stores indices (as strings)
 let highlightEnabled = false;
 let currentMaliciousState = null;
 
@@ -101,7 +101,7 @@ function renderQuiz(data) {
         transition: "background-color 0.3s",
     });
     maliciousButton.onclick = async () => {
-        // For malicious selection, enable highlighting (the user must then select words and click "Submit")
+        // For malicious selection, enable highlighting and show instructions.
         enableHighlighting(reportButtonsContainer);
     };
 
@@ -118,6 +118,13 @@ function renderQuiz(data) {
         transition: "background-color 0.3s",
     });
     notMaliciousButton.onclick = async () => {
+        // Add a loading indicator while waiting for the API response.
+        const loadingIndicator = createElement("div", "Loading...", {
+            textAlign: "center",
+            color: "white",
+            margin: "10px auto"
+        });
+        quizContainer.appendChild(loadingIndicator);
         try {
             const requestBody = {
                 id: window.currentQuestion?.id,
@@ -130,7 +137,7 @@ function renderQuiz(data) {
             });
             const responseData = await response.json();
             const valid = !responseData.feedback.toLowerCase().startsWith("incorrect");
-            // Show API feedback instead of a generic message
+            // Show API feedback (instead of generic feedback)
             renderAlert(responseData.feedback, valid);
             
             // Remove report buttons but keep displaying the same question with feedback.
@@ -159,12 +166,14 @@ function renderQuiz(data) {
                     await renderNextQuestion();
                 };
 
-                // Place Continue button immediately below the feedback alert
+                // Place Continue button immediately below the feedback alert.
                 document.getElementById("alert").insertAdjacentElement("afterend", continueButton);
             }
         } catch (error) {
             console.error("Error submitting feedback:", error);
             renderAlert("An error occurred while submitting your response.", false);
+        } finally {
+            loadingIndicator.remove();
         }
     };
 
@@ -178,6 +187,14 @@ function renderQuiz(data) {
 function enableHighlighting(reportButtonsContainer) {
     highlightEnabled = true;
     reportButtonsContainer.innerHTML = ""; // Remove previous buttons
+
+    // Add instructions for the user
+    const instructionText = createElement("p", "Please select the words that you think are red flags.", {
+        color: "white",
+        textAlign: "center",
+        margin: "10px auto"
+    });
+    quizContainer.appendChild(instructionText);
 
     const submitButton = createElement("button", "Submit", {
         backgroundColor: buttonThemeColor,
@@ -196,7 +213,13 @@ function enableHighlighting(reportButtonsContainer) {
             renderAlert("Selecting suspicious text is necessary.", false);
             return;
         }
-    
+        // Add loading indicator during API call
+        const loadingIndicator = createElement("div", "Loading...", {
+            textAlign: "center",
+            color: "white",
+            margin: "10px auto"
+        });
+        quizContainer.appendChild(loadingIndicator);
         const selectedWordsArray = getOrderedSelectedWords();
         const requestBody = {
             id: window.currentQuestion?.id,
@@ -254,6 +277,8 @@ function enableHighlighting(reportButtonsContainer) {
         } catch (error) {
             console.error("Error submitting feedback:", error);
             renderAlert("An error occurred while submitting your response.", false);
+        } finally {
+            loadingIndicator.remove();
         }
     };
     
