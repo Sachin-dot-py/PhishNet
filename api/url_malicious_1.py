@@ -16,7 +16,7 @@ with open("models/url/url_classifier.pkl", "rb") as model_file:
 with open("models/url/tfidf_vectorizer.pkl", "rb") as vec_file:
     vectorizer = pickle.load(vec_file)
 
-def predict_malicious_url(link: str) -> float:
+def predict_malicious_url_1(link: str) -> float:
     """
     Scans the given URL and returns the probability (between 0 and 1)
     that it is malicious.

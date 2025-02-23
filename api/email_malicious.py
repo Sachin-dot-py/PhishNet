@@ -1,7 +1,8 @@
 import re
 import pickle
 import pandas as pd
-from url_malicious import predict_malicious_url
+from api.url_malicious_1 import predict_malicious_url_1
+from api.url_malicious_2 import predict_malicious_url_2
 
 # Define the same text cleaning function
 def clean_text(text):
@@ -27,7 +28,7 @@ def predict_malicious_email(subject, body):
     links = re.findall(r'(https?://\S+)', body)
     if links:
         # Get malicious score for each link using the external function
-        link_scores = [predict_malicious_url(link) for link in links]
+        link_scores = [(predict_malicious_url_1(link) + predict_malicious_url_2(link))/2 for link in links]
         # For combining, we use the maximum risk among all links
         url_score = max(link_scores)
     else:

@@ -1,8 +1,16 @@
 from flask import Flask, request, jsonify
+import os
+import requests
 import random
+from dotenv import load_dotenv
 from email_malicious import predict_malicious_email
 
+load_dotenv()
 app = Flask(__name__)
+
+ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
+AUTH_TOKEN = os.environ.get("CLOUDFLARE_AUTH_TOKEN")
+LLM_API_URL = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/run/@cf/google/gemma-2b-it-lora"
 
 # Sample questions database
 QUESTIONS = [
@@ -92,39 +100,74 @@ def post_feedback():
     }
     return jsonify(response)
 
+def get_email_explanation(score, subject, body):
+    if score > 0.7:
+        # Prompt for emails that appear malicious
+        prompt = (
+            "Analyze the following email subject and body. "
+            "Based on research, emails are often malicious if they exhibit urgent language, mismatched sender details, "
+            "suspicious links/attachments, grammatical errors, or unusual requests for sensitive info. "
+            "Provide a single, concise explanation (maximum 25 words) stating exactly which red flag(s) triggered the malicious score. "
+            "Output only the explanation text. "
+            f"Subject: {subject} Body: {body}"
+        )
+    else:
+        # Prompt for emails that appear safe
+        prompt = (
+            "Analyze the following email subject and body. "
+            "Based on research, emails are considered safe when they lack urgent language, mismatched sender details, "
+            "suspicious links/attachments, grammatical errors, or unusual requests for sensitive info. "
+            "Provide a single, concise explanation (maximum 25 words) stating why the email appears safe. "
+            "Output only the explanation text. "
+            f"Subject: {subject} Body: {body}"
+        )
+    
+    response = requests.post(
+        LLM_API_URL,
+        headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+        json={
+            "messages": [
+                {"role": "system", "content": "You are an expert security assistant. You only have one chance to analyze the email and are only allowed to provide explanation text according to the specified requirements, with no context or follow up questions permited."},
+                {"role": "user", "content": prompt}
+            ]
+        }
+    )
+    result = response.json()
+    explanation = result.get("result")
+    return explanation
+
 @app.route('/api/blocker/predictMalicious', methods=['POST'])
 def predict_malicious():
     """
     Takes in a JSON payload with the following format:
     {
-        "type": str,         # One of "message", "tweet", or "email"
-        "content": str,      # Provided if type is "message" or "tweet" 
+        "type": str,         # One of "tweet" or "email"
+        "content": str,      # Provided if type is "tweet" 
         "subject": str,      # Provided if type is "email"
         "body": str          # Provided if type is "email"
     }
 
     Returns a JSON response in the following format:
     {
-        "score": int,         # A value of 0 or 1 representing the probability of the content being malicious
-        "explanation": str    # Explanation of why we think it's malicious or not, for display to the user
+        "score": float,         # A float value between 0 and 1 representing the probability of the content being malicious
+        "explanation": str      # Explanation of why we think it's malicious or not, for display to the user
     }
-
     """
     data = request.get_json()
 
-    if data.get("type") not in ["message", "tweet", "email"]:
+    if data.get("type") not in ["tweet", "email"]:
         return jsonify({"error": "Invalid content type"}), 400
     
     if data.get("type") == "email":
         score = predict_malicious_email(data.get("subject", ""), data.get("body", ""))
+        explanation = get_email_explanation(score, data.get("subject", ""), data.get("body", ""))
     else:
-        # Generate a random score (0 or 1) and a dummy explanation
+        # For tweets, use a dummy score and explanation
         score = random.randint(0, 1)
-
-    explanation = (
-        "The analysis indicates that the content is likely "
-        "malicious." if score == 1 else "The content appears to be safe."
-    )
+        explanation = (
+            "The analysis indicates that the content is likely malicious." if score == 1 
+            else "The content appears to be safe."
+        )
 
     return jsonify({
         "score": score,
