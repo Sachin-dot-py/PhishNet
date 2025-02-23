@@ -95,15 +95,9 @@ function renderQuiz(data) {
         transition: "background-color 0.3s",
     });
     maliciousButton.onclick = async () => {
-        const message = validateAnswer(true) ? "Correct! This message is malicious." : "Incorrect! This message is not malicious.";
-        renderAlert(message, validateAnswer(true));
-
-        if (validateAnswer(true)) {
-            enableHighlighting(reportButtonsContainer);
-            return;
-        }
-
-        await renderNextQuestion();
+        // For malicious selection, simply enable highlighting.
+        // Feedback will be shown after the API call when the user clicks "Submit".
+        enableHighlighting(reportButtonsContainer);
     };
 
     const notMaliciousButton = createElement("button", "Report as Not Malicious", {
@@ -119,9 +113,39 @@ function renderQuiz(data) {
     });
 
     notMaliciousButton.onclick = async () => {
-        const message = validateAnswer(false) ? "Correct! This message is not malicious." : "Incorrect! This message is malicious.";
+        const message = validateAnswer(false)
+            ? "Correct! This message is not malicious."
+            : "Incorrect! This message is malicious.";
         renderAlert(message, validateAnswer(false));
-        await renderNextQuestion();
+        // Remove report buttons and keep displaying the same question along with feedback.
+        reportButtonsContainer.innerHTML = "";
+        if (!document.getElementById("continueButton")) {
+            const continueButton = createElement("button", "Continue", {
+                backgroundColor: "#007bff",
+                color: "white",
+                border: "none",
+                borderRadius: "980px",
+                padding: "10px 20px",
+                margin: "10px auto",
+                cursor: "pointer",
+                fontSize: "16px",
+                transition: "background-color 0.3s",
+                display: "block",
+            });
+            continueButton.id = "continueButton";
+
+            continueButton.onclick = async () => {
+                continueButton.remove(); // Self destruct
+                clearQuizContainer();
+                const alertDiv = document.getElementById("alert");
+                if (alertDiv) {
+                    alertDiv.remove(); // Remove the alert feedback
+                }
+                await renderNextQuestion();
+            };
+
+            quizContainer.appendChild(continueButton);
+        }
     };
 
     reportButtonsContainer.appendChild(maliciousButton);
@@ -174,8 +198,9 @@ function enableHighlighting(reportButtonsContainer) {
     
             const responseData = await response.json();
             const valid = !responseData.feedback.toLowerCase().startsWith("incorrect");
+            // Display the API feedback instead of a default message.
             renderAlert(responseData.feedback, valid);
-
+    
             // Create continue button if it doesn't already exist
             if (!document.getElementById("continueButton")) {
                 const continueButton = createElement("button", "Continue", {
@@ -191,7 +216,7 @@ function enableHighlighting(reportButtonsContainer) {
                     display: "block",
                 });
                 continueButton.id = "continueButton";
-
+    
                 continueButton.onclick = async () => {
                     continueButton.remove(); // Self destruct
                     clearQuizContainer();
@@ -201,7 +226,7 @@ function enableHighlighting(reportButtonsContainer) {
                     }
                     await renderNextQuestion();
                 };
-
+    
                 quizContainer.appendChild(continueButton);
                 submitButton.style.display = "none"; // Hide submit button when continue button is visible
             }
@@ -210,7 +235,7 @@ function enableHighlighting(reportButtonsContainer) {
             renderAlert("An error occurred while submitting your response.", false);
         }
     };
-
+    
     quizContainer.appendChild(submitButton);
 }
 
@@ -291,7 +316,7 @@ function Tweet(content) {
         borderRadius: "50%",
         backgroundColor: "#444",
         marginRight: "10px",
-        backgroundImage: `url('https://i.pravatar.cc/40?u=${randomUsername}')`, // Random profile pic
+        backgroundImage: `url('https://i.pravatar.cc/40?u=${randomUsername}')`,
         backgroundSize: "cover",
     });
 
@@ -388,17 +413,17 @@ function handleMouseUp(event) {
             // Toggle highlight
             if (selectedWords.has(word)) {
                 selectedWords.delete(word);
-                span.style.backgroundColor = ""; // Remove highlight
-                span.style.color = ""; // Reset text color
+                span.style.backgroundColor = "";
+                span.style.color = "";
             } else {
                 selectedWords.add(word);
-                span.style.backgroundColor = "white"; // Highlight background color
-                span.style.color = "black"; // Highlight text color
+                span.style.backgroundColor = "white";
+                span.style.color = "black";
             }
         }
     });
 
-    selection.removeAllRanges(); // Clear selection after handling
+    selection.removeAllRanges();
 }
 
 // Clear selection on mouse down
@@ -445,5 +470,21 @@ function renderAlert(message, correct) {
     }
 }
 
-// Fetch questions and render the first one
-fetchQuestions().then(renderNextQuestion);
+// Show loading screen until first question loads
+const loadingScreen = createElement("div", "Loading Quiz...", {
+    position: "fixed",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    color: "white",
+    backgroundColor: "#000",
+    padding: "20px",
+    borderRadius: "10px",
+    fontSize: "24px",
+});
+document.body.appendChild(loadingScreen);
+
+fetchQuestions().then(() => {
+    loadingScreen.remove();
+    renderNextQuestion();
+});
