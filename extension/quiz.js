@@ -88,24 +88,7 @@ function renderQuiz(data) {
     // Buttons container with swapped order:
     const reportButtonsContainer = createElement("div", "", { margin: "10px auto", textAlign: "center" });
     
-    // "Report as Malicious" button appears on the left
-    const maliciousButton = createElement("button", "Report as Malicious", {
-        backgroundColor: buttonThemeColor,
-        color: "white",
-        border: "none",
-        borderRadius: "980px",
-        padding: "10px 20px",
-        margin: "0 5px",
-        cursor: "pointer",
-        fontSize: "16px",
-        transition: "background-color 0.3s",
-    });
-    maliciousButton.onclick = async () => {
-        // For malicious selection, enable highlighting and show instructions.
-        enableHighlighting(reportButtonsContainer);
-    };
-
-    // "Report as Not Malicious" button appears on the right
+    // "Report as Not Malicious" button appears on the left now.
     const notMaliciousButton = createElement("button", "Report as Not Malicious", {
         backgroundColor: greenButton,
         color: "white",
@@ -137,7 +120,7 @@ function renderQuiz(data) {
             });
             const responseData = await response.json();
             const valid = !responseData.feedback.toLowerCase().startsWith("incorrect");
-            // Show API feedback (instead of generic feedback)
+            // Show API feedback instead of a generic message
             renderAlert(responseData.feedback, valid);
             
             // Remove report buttons but keep displaying the same question with feedback.
@@ -177,9 +160,26 @@ function renderQuiz(data) {
         }
     };
 
-    // Append buttons in the desired order (malicious on left, non‑malicious on right)
-    reportButtonsContainer.appendChild(maliciousButton);
+    // "Report as Malicious" button appears on the right now.
+    const maliciousButton = createElement("button", "Report as Malicious", {
+        backgroundColor: buttonThemeColor,
+        color: "white",
+        border: "none",
+        borderRadius: "980px",
+        padding: "10px 20px",
+        margin: "0 5px",
+        cursor: "pointer",
+        fontSize: "16px",
+        transition: "background-color 0.3s",
+    });
+    maliciousButton.onclick = async () => {
+        // For malicious selection, enable highlighting and show instructions.
+        enableHighlighting(reportButtonsContainer);
+    };
+
+    // Append buttons in the new desired order:
     reportButtonsContainer.appendChild(notMaliciousButton);
+    reportButtonsContainer.appendChild(maliciousButton);
     quizContainer.appendChild(reportButtonsContainer);
 }
 
@@ -188,8 +188,8 @@ function enableHighlighting(reportButtonsContainer) {
     highlightEnabled = true;
     reportButtonsContainer.innerHTML = ""; // Remove previous buttons
 
-    // Add instructions for the user
-    const instructionText = createElement("p", "Please select the words that you think are red flags.", {
+    // Add updated instructions for the user.
+    const instructionText = createElement("p", "Pick the words that are sus.", {
         color: "white",
         textAlign: "center",
         margin: "10px auto"
