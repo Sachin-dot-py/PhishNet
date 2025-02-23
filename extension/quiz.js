@@ -4,7 +4,7 @@ const greenButton = "#09b852";
 
 let questionDeque = [];
 let quizContainer;
-let selectedWords = new Set();
+let selectedWords = new Set(); // Now stores indices (as strings) for uniqueness
 let highlightEnabled = false;
 let currentMaliciousState = null;
 
@@ -30,6 +30,11 @@ async function renderNextQuestion() {
     
     const currentQuestion = questionDeque.shift(); // Store current question
 
+    // Preload more questions if queue is running low
+    if (questionDeque.length < 3) {
+        loadMoreQuestions();
+    }
+    
     if (!currentQuestion) {
         console.error("No question data available to render");
         return;
@@ -41,10 +46,9 @@ async function renderNextQuestion() {
     clearQuizContainer();
     renderQuiz(currentQuestion);
     
-    // Attach currentQuestion to the window for reference in submitButton.onclick
+    // Attach currentQuestion to the window for reference
     window.currentQuestion = currentQuestion;
 }
-
 
 function validateAnswer(isMalicious) {
     return isMalicious === currentMaliciousState;
@@ -63,6 +67,7 @@ function renderQuiz(data) {
 
     if (!quizContainer) {
         quizContainer = createElement("div", "", { margin: "10px auto" });
+        // Append only to the quiz section so that the loading overlay shows only here
         document.getElementById("quiz").appendChild(quizContainer);
     }
 
@@ -80,9 +85,10 @@ function renderQuiz(data) {
             throw new Error(`Unknown data type: ${type}`);
     }
 
-    // Buttons container
+    // Buttons container with swapped order:
     const reportButtonsContainer = createElement("div", "", { margin: "10px auto", textAlign: "center" });
-
+    
+    // "Report as Malicious" button appears on the left
     const maliciousButton = createElement("button", "Report as Malicious", {
         backgroundColor: buttonThemeColor,
         color: "white",
@@ -95,11 +101,11 @@ function renderQuiz(data) {
         transition: "background-color 0.3s",
     });
     maliciousButton.onclick = async () => {
-        // For malicious selection, simply enable highlighting.
-        // Feedback will be shown after the API call when the user clicks "Submit".
+        // For malicious selection, enable highlighting (the user must then select words and click "Submit")
         enableHighlighting(reportButtonsContainer);
     };
 
+    // "Report as Not Malicious" button appears on the right
     const notMaliciousButton = createElement("button", "Report as Not Malicious", {
         backgroundColor: greenButton,
         color: "white",
@@ -111,50 +117,64 @@ function renderQuiz(data) {
         fontSize: "16px",
         transition: "background-color 0.3s",
     });
-
     notMaliciousButton.onclick = async () => {
-        const message = validateAnswer(false)
-            ? "Correct! This message is not malicious."
-            : "Incorrect! This message is malicious.";
-        renderAlert(message, validateAnswer(false));
-        // Remove report buttons but keep displaying the same question along with feedback.
-        reportButtonsContainer.innerHTML = "";
-        if (!document.getElementById("continueButton")) {
-            const continueButton = createElement("button", "Continue", {
-                backgroundColor: "#007bff",
-                color: "white",
-                border: "none",
-                borderRadius: "980px",
-                padding: "10px 20px",
-                margin: "10px auto",
-                cursor: "pointer",
-                fontSize: "16px",
-                transition: "background-color 0.3s",
-                display: "block",
-            });
-            continueButton.id = "continueButton";
-
-            continueButton.onclick = async () => {
-                continueButton.remove(); // Self destruct
-                clearQuizContainer();
-                const alertDiv = document.getElementById("alert");
-                if (alertDiv) {
-                    alertDiv.remove(); // Remove the alert feedback
-                }
-                await renderNextQuestion();
+        try {
+            const requestBody = {
+                id: window.currentQuestion?.id,
+                userMalicious: false,
             };
+            const response = await fetch(`${AWS_LINK}/api/game/getFeedback`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody),
+            });
+            const responseData = await response.json();
+            const valid = !responseData.feedback.toLowerCase().startsWith("incorrect");
+            // Show API feedback instead of a generic message
+            renderAlert(responseData.feedback, valid);
+            
+            // Remove report buttons but keep displaying the same question with feedback.
+            reportButtonsContainer.innerHTML = "";
+            if (!document.getElementById("continueButton")) {
+                const continueButton = createElement("button", "Continue", {
+                    backgroundColor: "#007bff",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "980px",
+                    padding: "10px 20px",
+                    margin: "10px auto",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    transition: "background-color 0.3s",
+                    display: "block",
+                });
+                continueButton.id = "continueButton";
+                continueButton.onclick = async () => {
+                    continueButton.remove(); // Self destruct
+                    clearQuizContainer();
+                    const alertDiv = document.getElementById("alert");
+                    if (alertDiv) {
+                        alertDiv.remove();
+                    }
+                    await renderNextQuestion();
+                };
 
-            // Insert the Continue button right after the feedback alert.
-            document.getElementById("alert").insertAdjacentElement("afterend", continueButton);
+                // Place Continue button immediately below the feedback alert
+                document.getElementById("alert").insertAdjacentElement("afterend", continueButton);
+            }
+        } catch (error) {
+            console.error("Error submitting feedback:", error);
+            renderAlert("An error occurred while submitting your response.", false);
         }
     };
 
+    // Append buttons in the desired order (malicious on left, non‑malicious on right)
     reportButtonsContainer.appendChild(maliciousButton);
     reportButtonsContainer.appendChild(notMaliciousButton);
     quizContainer.appendChild(reportButtonsContainer);
 }
 
-// Enable highlighting and show submit button
+// Enable highlighting and show submit button (for malicious selections)
 function enableHighlighting(reportButtonsContainer) {
     highlightEnabled = true;
     reportButtonsContainer.innerHTML = ""; // Remove previous buttons
@@ -199,7 +219,7 @@ function enableHighlighting(reportButtonsContainer) {
     
             const responseData = await response.json();
             const valid = !responseData.feedback.toLowerCase().startsWith("incorrect");
-            // Display the API feedback instead of a default message.
+            // Show API feedback instead of a generic message.
             renderAlert(responseData.feedback, valid);
     
             if (!document.getElementById("continueButton")) {
@@ -218,18 +238,18 @@ function enableHighlighting(reportButtonsContainer) {
                 continueButton.id = "continueButton";
     
                 continueButton.onclick = async () => {
-                    continueButton.remove(); // Self destruct
+                    continueButton.remove();
                     clearQuizContainer();
                     const alertDiv = document.getElementById("alert");
                     if (alertDiv) {
-                        alertDiv.remove(); // Remove the alert feedback
+                        alertDiv.remove();
                     }
                     await renderNextQuestion();
                 };
     
-                // Insert the Continue button right after the feedback alert.
+                // Insert Continue button immediately after the feedback alert.
                 document.getElementById("alert").insertAdjacentElement("afterend", continueButton);
-                submitButton.style.display = "none"; // Hide submit button when continue button is visible
+                submitButton.style.display = "none"; // Hide submit button when Continue button appears
             }
         } catch (error) {
             console.error("Error submitting feedback:", error);
@@ -240,7 +260,7 @@ function enableHighlighting(reportButtonsContainer) {
     quizContainer.appendChild(submitButton);
 }
 
-// Function to create elements
+// Helper to create DOM elements with styles
 function createElement(tag, innerText, styles = {}) {
     const el = document.createElement(tag);
     el.innerText = innerText;
@@ -266,9 +286,10 @@ function Email(subjectContent, bodyContent) {
     const hr = createElement("hr", "", { borderColor: "rgb(255, 255, 255)", margin: "5px 0" });
     const body = createElement("p", "", { fontSize: "14px" });
 
+    // Use updated wrapTextInSpans to include data-index on each word
     body.innerHTML = wrapTextInSpans(bodyContent);
     body.dataset.originalText = bodyContent;
-    // Attach click listener for toggling word selection.
+    // Attach click handler for toggling selection
     attachClickHandlerToSpans(body);
 
     frame.appendChild(sender);
@@ -337,7 +358,6 @@ function Tweet(content) {
     const contentElement = createElement("p", "", { margin: "5px 0", fontSize: "15px", lineHeight: "1.5" });
     contentElement.innerHTML = wrapTextInSpans(content);
     contentElement.dataset.originalText = content;
-    // Attach click listener for toggling word selection.
     attachClickHandlerToSpans(contentElement);
 
     const actions = createElement("div", "", {
@@ -372,38 +392,37 @@ function SMS(content) {
 
     contentContainer.innerHTML = wrapTextInSpans(content);
     contentContainer.dataset.originalText = content;
-    // Attach click listener for toggling word selection.
     attachClickHandlerToSpans(contentContainer);
 
     quizContainer.appendChild(contentContainer);
 }
 
-// Wrap words in spans for highlight toggling
+// Updated: Wrap each word in a span with a unique data-index.
 function wrapTextInSpans(text) {
     return text
         .split(" ")
-        .map(word => `<span style="cursor: pointer; transition: background-color 0.3s;">${word} </span>`)
+        .map((word, index) => `<span data-index="${index}" style="cursor: pointer; transition: background-color 0.3s;">${word} </span>`)
         .join("");
 }
 
-// New function to toggle word selection on click
+// Toggle word selection based on its data-index
 function toggleWordSelection(event) {
     if (!highlightEnabled) return;
     const span = event.target;
     if (span.tagName.toLowerCase() !== "span") return;
-    const word = span.innerText.trim();
-    if (selectedWords.has(word)) {
-        selectedWords.delete(word);
+    const index = span.getAttribute("data-index");
+    if (selectedWords.has(index)) {
+        selectedWords.delete(index);
         span.style.backgroundColor = "";
         span.style.color = "";
     } else {
-        selectedWords.add(word);
+        selectedWords.add(index);
         span.style.backgroundColor = "white";
         span.style.color = "black";
     }
 }
 
-// Attach click event to all spans within a container
+// Attach click event listener to all span elements within a container
 function attachClickHandlerToSpans(container) {
     const spans = container.querySelectorAll("span");
     spans.forEach(span => {
@@ -411,24 +430,28 @@ function attachClickHandlerToSpans(container) {
     });
 }
 
-// Get selected words in original order
+// Get selected words in the original order using indices
 function getOrderedSelectedWords() {
     const textContainer = document.querySelector("[data-original-text]");
     if (!textContainer) return [];
-
     const originalWords = textContainer.dataset.originalText.split(" ");
-    return originalWords.filter(word => selectedWords.has(word));
+    const selectedArray = [];
+    for (let i = 0; i < originalWords.length; i++) {
+        if (selectedWords.has(i.toString())) {
+            selectedArray.push(originalWords[i]);
+        }
+    }
+    return selectedArray;
 }
-
 
 function renderAlert(message, correct) {
     let alertDiv = document.getElementById("alert");
     const firstWord = message.split(" ")[0];
     const restOfMessage = message.substring(firstWord.length);
 
-    const firstWordSpan = firstWord.includes("!") 
+    const firstWordSpan = firstWord.includes("!")
         ? `<span style="color: ${correct ? 'green' : 'red'};">${firstWord}</span>`
-    : `<span style="color: white">${firstWord}</span>`;
+        : `<span style="color: white">${firstWord}</span>`;
     const restOfMessageSpan = `<span style="color: white;">${restOfMessage}</span>`;
 
     const formattedMessage = `${firstWordSpan}${restOfMessageSpan}`;
@@ -442,7 +465,7 @@ function renderAlert(message, correct) {
             width: "85%",
         });
         alertDiv.id = "alert";
-        // Append alert to the quiz section so feedback stays with the quiz.
+        // Append alert to the quiz section so that feedback stays with the quiz.
         document.getElementById("quiz").appendChild(alertDiv);
         alertDiv.innerHTML = formattedMessage;
     } else {
@@ -450,7 +473,7 @@ function renderAlert(message, correct) {
     }
 }
 
-// Show loading screen until first question loads
+// Show loading screen only on the quiz page
 const loadingScreen = createElement("div", "Loading Quiz...", {
     position: "fixed",
     top: "50%",
