@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Phish Net",
     "version": "1.0",
-    "description": "A chrome extension that flags fake news on almost every social media website and comes with a practice game.",
+    "description": "A chrome extension that flags potential phishing attempts on almost every social media website and comes with a practice game.",
     "action": {
         "default_popup": "index.html",
         "default_icon": "icons/logo_black.png"
