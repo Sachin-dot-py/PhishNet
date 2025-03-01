@@ -11,6 +11,8 @@ Watch the demo here: https://youtu.be/cKemeIPhQCk
 
 Presentation: https://www.canva.com/design/DAGf4uCPoq4/CjhXwroI3vKfgqdKF8bmew/edit
 
+Install the extension on the Chrome Web Store: https://chromewebstore.google.com/detail/phish-net/lllecpchjhllolknfecnhmjdjmlameog
+
 ## Inspiration
 With the rise of phishing attacks on social media, emails, and messaging platforms, we realized how easy it is for people to fall victim to malicious links and deceptive messages. Phishing attempts don’t even include obvious scam links anymore—they use hyperlinked text that looks legitimate but redirects to malicious sites, making them even harder to detect. A single click can lead to stolen data, financial loss, or account takeovers.
 We realized that many people fall for phishing scams not because they’re careless, but because phishing tactics are becoming harder to spot. Many existing security solutions are either too complex for everyday users or fail to provide real-time, interactive learning. 
